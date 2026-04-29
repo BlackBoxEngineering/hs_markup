@@ -1,12 +1,18 @@
 # hs_markup
 
-A lightweight, deterministic markup language and WYSIWYG editor for rich text. Zero HTML output — safe for on-chain storage, untrusted rendering, or anywhere you need a portable rich text format.
+Deterministic rich-text markup + editor for React.
 
-No ProseMirror. No Tiptap. No bloat. Works anywhere React runs.
+No HTML storage. Canonical short tags. Stable round-trips.
 
-## Markup Language
+## Why
 
-```
+- Deterministic: editor DOM serializes to canonical markup (`[b]`, `[code lg=js]`, etc.)
+- Minimal: small API surface, no heavy editor framework dependency
+- Auditable: plain-text markup, no hidden HTML artifacts
+
+## Markup
+
+```txt
 [t]Hello World[/t]
 [b]Bold[/b] and [i]italic[/i]
 [h1]Section Title[/h1]
@@ -14,50 +20,42 @@ No ProseMirror. No Tiptap. No bloat. Works anywhere React runs.
 [code lg=js]const x = 1;[/code]
 ```
 
-| Tag | Renders as | Purpose |
-|------|------------|---------|
-| `[t]` | styled span | Title |
-| `[b]` | `<strong>` | Bold |
-| `[i]` | `<em>` | Italic |
-| `[u]` | `<u>` | Underline |
-| `[s]` | `<s>` | Strikethrough |
-| `[h]` | `<h2>` | Heading |
-| `[h1]` `[h2]` `[h3]` | `<h1-3>` | Sized headings |
-| `[hl]` | styled span | Highlight |
-| `[code]` | `<code>` | Code block |
-| `[q]` | `<blockquote>` | Quote |
+Supported tags:
 
-Newlines are literal `\n` — no special tag needed. The display container uses `white-space: pre-wrap`.
+- `[t]` title
+- `[b]` bold
+- `[i]` italic
+- `[u]` underline
+- `[s]` strike
+- `[h]` heading
+- `[h1]` `[h2]` `[h3]` headings
+- `[hl]` highlight
+- `[q]` quote
+- `[code]` code block (optional `lg` metadata)
 
+Code language allowlist (`lg`): `js`, `ts`, `sol`, `py`, `sh`, `json`.
 
-`[code]` supports optional language metadata via `lg` (allowlist): `js`, `ts`, `sol`, `py`, `sh`, `json`.
-Example: `[code lg=sol]function f() public {}[/code]`
+Example:
+
+```txt
+[code lg=sol]function f() public {}[/code]
+```
+
 ## Install
 
-Not on npm yet. Install locally from the repo:
+### From npm
 
 ```bash
-# from your project root
+npm install hs_markup
+```
+
+### From GitHub/local during development
+
+```bash
 npm install ../hs_markup
 ```
 
-Or add it to your `package.json` as a local dependency:
-
-```json
-{
-  "dependencies": {
-    "hs_markup": "file:../hs_markup"
-  }
-}
-```
-
-React 18+ is a peer dependency.
-
-## API
-
-### WYSIWYG Editor
-
-A `contentEditable`-based editor with toolbar, theme support, and keyboard shortcuts (Ctrl/Cmd+B/I/U).
+## Basic usage
 
 ```tsx
 import { HsMarkupEditor } from 'hs_markup';
@@ -77,7 +75,7 @@ const theme: Theme = {
 };
 
 <HsMarkupEditor
-  value={markup}
+  content={markup}
   onChange={setMarkup}
   currentTheme={theme}
   maxLength={1000}
@@ -85,11 +83,9 @@ const theme: Theme = {
 />
 ```
 
-`onChange` emits the raw markup string — always canonical short tags, never HTML.
+`onChange` emits canonical markup only (never HTML).
 
-### Renderer
-
-Converts a markup string to React nodes for read-only display.
+## Read-only rendering
 
 ```tsx
 import { transformContent } from 'hs_markup';
@@ -99,78 +95,56 @@ import { transformContent } from 'hs_markup';
 </div>
 ```
 
-### Parser
+## API
 
-Converts a markup string to an AST.
+- `HsMarkupEditor`
+- `Toolbar`
+- `applyFormat`
+- `commands`
+- `parseMarkup`
+- `displayToMarkup`
+- `transformContent`
+- `highlightCode`, `highlightCSS`
+- `TAGS`, `canonicalTag`
 
-```ts
-import { parseMarkup } from 'hs_markup';
+## Legacy tag compatibility
 
-const nodes = parseMarkup('[b]Hello[/b]');
-// [{ type: 'element', tag: 'b', children: [{ type: 'text', value: 'Hello' }] }]
+Accepted legacy tags are normalized to canonical short tags on parse.
+
+- `[bold]` -> `[b]`
+- `[italic]` -> `[i]`
+- `[underline]` -> `[u]`
+- `[header]` -> `[h]`
+- `[title]` -> `[t]`
+- `[quote]` -> `[q]`
+- `[highlight]` -> `[hl]`
+
+## Publish checklist
+
+```bash
+npm run build
+npm test
+npm login
+npm publish
 ```
 
-### Serialiser
+Then consumers can use:
 
-Converts editor DOM back to a markup string.
-
-```ts
-import { displayToMarkup } from 'hs_markup';
-
-const markup = displayToMarkup(editorElement);
+```json
+{
+  "dependencies": {
+    "hs_markup": "^0.1.0"
+  }
+}
 ```
-
-### Tag Registry
-
-```ts
-import { TAGS, canonicalTag } from 'hs_markup';
-
-TAGS['b'];           // { tag: 'b', element: 'strong' }
-canonicalTag('bold'); // 'b'
-canonicalTag('b');    // 'b'
-```
-
-## Legacy Tag Support
-
-The parser and renderer accept both short and long-form tags. Legacy tags are normalised to their canonical short form on parse — the serialiser and editor never emit them.
-
-| Legacy | Canonical |
-|--------|-----------|
-| `[bold]` | `[b]` |
-| `[italic]` | `[i]` |
-| `[underline]` | `[u]` |
-| `[header]` | `[h]` |
-| `[title]` | `[t]` |
-| `[quote]` | `[q]` |
-| `[highlight]` | `[hl]` |
-
-## Architecture
-
-```
-src/
-  language/    Tag registry and spec
-  parser/      Markup string ↔ AST / editor DOM
-  editor/      contentEditable WYSIWYG editor
-  render/      Markup string → React components
-  theme.ts     Theme type definition
-  index.ts     Public API
-```
-
-The editor uses `data-tag` spans internally (`<span data-tag="b">`) rather than semantic HTML elements. This gives deterministic round-trips — `data-tag="b"` always serialises to `[b]...[/b]`, no browser normalisation issues.
-
-Three core functions drive everything:
-- `markupToEditorHTML(markup)` — load: markup → editor DOM
-- `displayToMarkup(el)` — save: editor DOM → markup
-- `applyFormat(tag)` — format: wrap selection in a tag
 
 ## Tests
 
 ```bash
-npm install
 npm test
 ```
 
-36 tests covering parser behaviour, legacy tag normalisation, edge cases, and full round-trip integrity (`markup → editor DOM → markup`).
+Current suite includes parser, round-trip, tags, and highlighting tests.
 
 ## License
 

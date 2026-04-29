@@ -14,7 +14,7 @@
     #editor [data-tag="h1"]   { font-size: 2em; font-weight: bold; display: block; }
     #editor [data-tag="h2"]   { font-size: 1.5em; font-weight: bold; display: block; }
     #editor [data-tag="h3"]   { font-size: 1.17em; font-weight: bold; display: block; }
-    #editor [data-tag="code"] { font-family: monospace; background: #f4f4f4; padding: 0 .25em; }
+    #editor [data-tag="code"] { display: block; font-family: monospace; background: #f4f4f4; padding: .5em .75em; white-space: pre; overflow-x: auto; border-radius: 4px; }
     #editor [data-tag="q"]    { border-left: 3px solid #ccc; padding-left: .75em; color: #555; display: block; }
     #output { margin-top: 1rem; background: #f9f9f9; padding: .75rem; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: .9em; }
     .toolbar { display: flex; gap: .5rem; margin-bottom: .5rem; flex-wrap: wrap; }
@@ -24,15 +24,27 @@
 <body>
   <h2>hs_markup demo</h2>
   <div class="toolbar">
-    <button onclick="fmt('b')"><b>B</b></button>
-    <button onclick="fmt('i')"><i>I</i></button>
-    <button onclick="fmt('u')"><u>U</u></button>
-    <button onclick="fmt('s')"><s>S</s></button>
-    <button onclick="fmt('t')">T</button>
-    <button onclick="fmt('h1')">H1</button>
-    <button onclick="fmt('h2')">H2</button>
-    <button onclick="fmt('code')">Code</button>
-    <button onclick="fmt('q')">Quote</button>
+    <button type="button" onmousedown="toolbarFmt(event, 'b')"><b>B</b></button>
+    <button type="button" onmousedown="toolbarFmt(event, 'i')"><i>I</i></button>
+    <button type="button" onmousedown="toolbarFmt(event, 'u')"><u>U</u></button>
+    <button type="button" onmousedown="toolbarFmt(event, 's')"><s>S</s></button>
+    <button type="button" onmousedown="toolbarFmt(event, 't')">T</button>
+    <button type="button" onmousedown="toolbarFmt(event, 'h1')">H1</button>
+    <button type="button" onmousedown="toolbarFmt(event, 'h2')">H2</button>
+    <button type="button" onmousedown="toolbarFmt(event, 'code')">Code</button>
+    <button type="button" onmousedown="toolbarFmt(event, 'q')">Quote</button>
+    <label for="codeLang" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.9em;">
+      Lang
+      <select id="codeLang">
+        <option value="">none</option>
+        <option value="js">js</option>
+        <option value="ts">ts</option>
+        <option value="sol">sol</option>
+        <option value="py">py</option>
+        <option value="sh">sh</option>
+        <option value="json">json</option>
+      </select>
+    </label>
   </div>
   <div id="editor" contenteditable="true"></div>
   <div id="output"></div>
@@ -40,34 +52,104 @@
   <script>
     const editor = document.getElementById('editor');
     const output = document.getElementById('output');
+    const codeLang = document.getElementById('codeLang');
+    let savedRange = null;
 
-    function nodeToMarkup(node) {
+    const BLOCK_BREAK_TAGS = new Set(['DIV', 'P', 'LI']);
+
+    function nodeToMarkup(node, isRoot = false) {
       if (node.nodeType === Node.TEXT_NODE) return node.textContent;
       if (node.tagName === 'BR') return '\n';
+      if (node.nodeType !== Node.ELEMENT_NODE) return '';
       const tag = node.dataset && node.dataset.tag;
-      const children = Array.from(node.childNodes).map(nodeToMarkup).join('');
-      return tag ? `[${tag}]${children}[/${tag}]` : children;
+      const children = Array.from(node.childNodes)
+        .map(child => nodeToMarkup(child))
+        .join('');
+      if (tag) {
+        const lg = tag === 'code' && node.dataset && node.dataset.lg ? ` lg=${node.dataset.lg}` : '';
+        return `[${tag}${lg}]${children}[/${tag}]`;
+      }
+      if (!isRoot && BLOCK_BREAK_TAGS.has(node.tagName)) return `${children}\n`;
+      return children;
+    }
+
+    function extractTextPreserving(node) {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+      if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+        return Array.from(node.childNodes).map(extractTextPreserving).join('');
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return '';
+      if (node.tagName === 'BR') return '\n';
+      const children = Array.from(node.childNodes).map(extractTextPreserving).join('');
+      return BLOCK_BREAK_TAGS.has(node.tagName) ? `${children}\n` : children;
+    }
+
+    function toolbarFmt(e, tag) {
+      e.preventDefault();
+      restoreSelection();
+      fmt(tag);
+    }
+
+    function saveSelection() {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      if (!editor.contains(range.commonAncestorContainer)) return;
+      savedRange = range.cloneRange();
+    }
+
+    function restoreSelection() {
+      if (!savedRange) return;
+      const sel = window.getSelection();
+      if (!sel) return;
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
     }
 
     function fmt(tag) {
       const sel = window.getSelection();
-      if (!sel || sel.isCollapsed) return;
-      const range = sel.getRangeAt(0);
-      const text = range.toString();
+      const sourceRange = savedRange
+        ? savedRange.cloneRange()
+        : (sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null);
+      if (!sourceRange) return;
+      if (!editor.contains(sourceRange.commonAncestorContainer)) return;
+      if (sourceRange.collapsed) return;
+
+      const text = tag === 'code'
+        ? extractTextPreserving(sourceRange.cloneContents())
+        : sourceRange.toString();
       if (!text) return;
+
+      const range = sourceRange;
       const span = document.createElement('span');
       span.dataset.tag = tag;
+      if (tag === 'code') {
+        const lg = codeLang && codeLang.value ? codeLang.value : '';
+        if (lg) span.dataset.lg = lg;
+        span.setAttribute('spellcheck', 'false');
+        span.setAttribute('autocorrect', 'off');
+        span.setAttribute('autocapitalize', 'off');
+        span.setAttribute('autocomplete', 'off');
+      }
       span.textContent = text;
       range.deleteContents();
       range.insertNode(span);
+      const after = document.createRange();
+      after.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(after);
+      savedRange = after.cloneRange();
       sync();
     }
 
     function sync() {
-      output.textContent = nodeToMarkup(editor);
+      output.textContent = nodeToMarkup(editor, true);
     }
 
     editor.addEventListener('input', sync);
+    editor.addEventListener('mouseup', saveSelection);
+    editor.addEventListener('keyup', saveSelection);
+    document.addEventListener('selectionchange', saveSelection);
     editor.addEventListener('paste', e => {
       e.preventDefault();
       const text = e.clipboardData.getData('text/plain');

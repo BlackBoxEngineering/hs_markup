@@ -68,7 +68,9 @@ describe('parseMarkup', () => {
   it('treats unknown tags as plain text', () => {
     const nodes = parseMarkup('[xyz]Hello[/xyz]');
     expect(nodes).toEqual([
-      { type: 'text', value: '[xyz]Hello[/xyz]' },
+      { type: 'text', value: '[xyz]' },
+      { type: 'text', value: 'Hello' },
+      { type: 'text', value: '[/xyz]' },
     ]);
   });
 
@@ -110,6 +112,29 @@ describe('parseMarkup', () => {
     expect(nodes).toEqual([
       { type: 'element', tag: 'b', children: [] },
       { type: 'element', tag: 'i', children: [] },
+    ]);
+  });
+
+  it('parses code language attribute with allowlisted value', () => {
+    const nodes = parseMarkup('[code lg=js]const x = 1;[/code]');
+    expect(nodes).toEqual([
+      {
+        type: 'element',
+        tag: 'code',
+        attrs: { lg: 'js' },
+        children: [{ type: 'text', value: 'const x = 1;' }],
+      },
+    ]);
+  });
+
+  it('drops non-allowlisted code language attribute values', () => {
+    const nodes = parseMarkup('[code lg=rust]let x = 1;[/code]');
+    expect(nodes).toEqual([
+      {
+        type: 'element',
+        tag: 'code',
+        children: [{ type: 'text', value: 'let x = 1;' }],
+      },
     ]);
   });
 });

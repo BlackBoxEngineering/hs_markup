@@ -113,13 +113,11 @@ export const editorCSS = `
     overflow-x: auto;
     margin: 0.5em 0;
   }
-  [data-hs-editor] [data-tag="pre"] {
-    display: block;
-    font-family: 'Fira Code', 'Courier New', monospace;
-    background: var(--hs-shade);
-    padding: 0.5em 0.75em;
-    border-radius: 4px;
-    font-size: 0.9em;
-    font-weight: normal;
-  }
+  .hs-hl-kw  { color: #c678dd; }
+  .hs-hl-str { color: #98c379; }
+  .hs-hl-cmt { color: #7f848e; font-style: italic; }
+  .hs-hl-num { color: #d19a66; }
+  .hs-hl-fn  { color: #61afef; }
+  .hs-hl-op  { color: #56b6c2; }
+  .hs-hl-punc { color: #abb2bf; }
 `;

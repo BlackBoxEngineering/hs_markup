@@ -3,7 +3,7 @@ import { TAGS, canonicalTag } from '../src/language/tags';
 
 describe('canonicalTag', () => {
   it('returns short tags unchanged', () => {
-    const shortTags = ['t', 'b', 'i', 'u', 's', 'h', 'h1', 'h2', 'h3', 'hl', 'code', 'pre', 'q'];
+    const shortTags = ['t', 'b', 'i', 'u', 's', 'h', 'h1', 'h2', 'h3', 'hl', 'code', 'q'];
     for (const tag of shortTags) {
       expect(canonicalTag(tag)).toBe(tag);
     }

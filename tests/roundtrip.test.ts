@@ -83,7 +83,6 @@ describe('round-trip: markup → editor DOM → markup', () => {
       '[h3]H3[/h3]',
       '[hl]Highlight[/hl]',
       '[code]x = 1[/code]',
-      '[pre]block[/pre]',
       '[q]Quote[/q]',
     ];
     for (const input of cases) {
@@ -107,5 +106,13 @@ describe('round-trip: markup → editor DOM → markup', () => {
 
   it('tags inside code parse as tags and still round-trip', () => {
     expect(roundTrip('[code][b]not bold[/b][/code]')).toBe('[code][b]not bold[/b][/code]');
+  });
+
+  it('code language attribute round-trips for allowlisted values', () => {
+    expect(roundTrip('[code lg=js]const x = 1;[/code]')).toBe('[code lg=js]const x = 1;[/code]');
+  });
+
+  it('code language attribute is dropped for non-allowlisted values', () => {
+    expect(roundTrip('[code lg=rust]let x = 1;[/code]')).toBe('[code]let x = 1;[/code]');
   });
 });

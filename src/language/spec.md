@@ -7,6 +7,10 @@ hs_markup is a deterministic, safe markup language for rich text. It uses square
 ```
 [tag]content[/tag]
 ```
+Optional attributes are allowed on opening tags:
+```
+[code lg=js]content[/code]
+```
 
 ## Supported Tags
 
@@ -20,8 +24,7 @@ hs_markup is a deterministic, safe markup language for rich text. It uses square
 | `[h1]`    | `<h1>`        | Heading 1       |
 | `[h2]`    | `<h2>`        | Heading 2       |
 | `[h3]`    | `<h3>`        | Heading 3       |
-| `[code]`  | `<code>`      | Inline code     |
-| `[pre]`   | `<pre>`       | Code block      |
+| `[code]`  | `<code>`      | Code block      |
 | `[q]`     | `<blockquote>`| Quote           |
 
 ## Rules
@@ -37,5 +40,5 @@ hs_markup is a deterministic, safe markup language for rich text. It uses square
 [b]Bold[/b] and [i]italic[/i]
 [h1]Section Title[/h1]
 [q]A quoted passage[/q]
-[pre][code]const x = 1;[/code][/pre]
+[code lg=js]const x = 1;[/code]
 ```

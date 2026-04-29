@@ -19,7 +19,6 @@ export const TAGS: Record<string, TagDef> = {
   h3:   { tag: 'h3',   element: 'h3' },
   hl:   { tag: 'hl',   element: 'span',       className: 'hs-highlight' },
   code: { tag: 'code', element: 'code' },
-  pre:  { tag: 'pre',  element: 'pre' },
   q:    { tag: 'q',    element: 'blockquote' },
 
   // legacy tags — read-only, never produced by editor

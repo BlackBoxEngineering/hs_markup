@@ -11,7 +11,7 @@ No ProseMirror. No Tiptap. No bloat. Works anywhere React runs.
 [b]Bold[/b] and [i]italic[/i]
 [h1]Section Title[/h1]
 [q]A quoted passage[/q]
-[pre][code]const x = 1;[/code][/pre]
+[code lg=js]const x = 1;[/code]
 ```
 
 | Tag | Renders as | Purpose |
@@ -24,12 +24,14 @@ No ProseMirror. No Tiptap. No bloat. Works anywhere React runs.
 | `[h]` | `<h2>` | Heading |
 | `[h1]` `[h2]` `[h3]` | `<h1-3>` | Sized headings |
 | `[hl]` | styled span | Highlight |
-| `[code]` | `<code>` | Inline code |
-| `[pre]` | `<pre>` | Code block |
+| `[code]` | `<code>` | Code block |
 | `[q]` | `<blockquote>` | Quote |
 
 Newlines are literal `\n` — no special tag needed. The display container uses `white-space: pre-wrap`.
 
+
+`[code]` supports optional language metadata via `lg` (allowlist): `js`, `ts`, `sol`, `py`, `sh`, `json`.
+Example: `[code lg=sol]function f() public {}[/code]`
 ## Install
 
 Not on npm yet. Install locally from the repo:

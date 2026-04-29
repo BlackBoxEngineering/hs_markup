@@ -4,26 +4,26 @@ export function applyFormat(tag) {
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed)
         return;
     const range = sel.getRangeAt(0);
-    if (range.toString() === '' && !PRESERVE_WHITESPACE_TAGS.has(tag))
-        return;
     // toggle: if entire selection is inside a span with the same tag, unwrap it
     const existing = findWrappingTag(range, tag);
     if (existing && range.toString().length === (existing.textContent?.length ?? 0)) {
         unwrapSpan(existing);
         return;
     }
-    // extract DOM fragment — preserves structure including <br> nodes
-    const fragment = range.extractContents();
+    // clone first so we never lose content
+    const fragment = range.cloneContents();
     const text = PRESERVE_WHITESPACE_TAGS.has(tag)
         ? extractTextPreserving(fragment)
-        : fragment.textContent ?? '';
+        : range.toString();
+    if (!text)
+        return;
+    // now safe to delete and replace
+    range.deleteContents();
     const wrapper = document.createElement('span');
     wrapper.dataset.tag = tag;
     wrapper.textContent = text;
     range.insertNode(wrapper);
-    // clean up empty nodes left behind
     cleanEmptySpans(wrapper.parentElement);
-    // restore selection to wrapped content
     const newRange = document.createRange();
     newRange.selectNodeContents(wrapper);
     sel.removeAllRanges();

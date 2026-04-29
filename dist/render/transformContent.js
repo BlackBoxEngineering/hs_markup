@@ -2,10 +2,10 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import React from 'react';
 import { parseMarkup } from '../parser/markupToDisplay';
 import { TAGS } from '../language/tags';
-export function transformContent(markup) {
-    return renderNodes(parseMarkup(markup));
+export function transformContent(markup, renderers) {
+    return renderNodes(parseMarkup(markup), '', renderers);
 }
-function renderNodes(nodes, keyPrefix = '') {
+function renderNodes(nodes, keyPrefix = '', renderers) {
     return nodes.map((node, i) => {
         const key = `${keyPrefix}${i}`;
         if (node.type === 'text') {
@@ -14,6 +14,12 @@ function renderNodes(nodes, keyPrefix = '') {
         const def = TAGS[node.tag];
         if (!def)
             return null;
-        return React.createElement(def.element, { key, className: def.className }, ...renderNodes(node.children, `${key}-`));
+        const children = renderNodes(node.children, `${key}-`, renderers);
+        // use host-provided renderer if supplied
+        const Custom = renderers?.[node.tag];
+        if (Custom) {
+            return _jsx(Custom, { children: children }, key);
+        }
+        return React.createElement(def.element, { key, className: def.className }, ...children);
     });
 }

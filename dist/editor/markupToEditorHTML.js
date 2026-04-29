@@ -1,14 +1,15 @@
 import { TAGS, canonicalTag } from '../language/tags';
-const TAG_NAMES = Object.keys(TAGS).join('|');
-const TAG_RE = new RegExp(`\\[(\\/?(${TAG_NAMES}))\\]`, 'g');
+import { sanitiseCodeLanguage } from '../language/codeLang';
+const TAG_RE = /\[(\/?)([a-z0-9]+)(?:\s+([^\]]+))?\]/gi;
+const ATTR_RE = /([a-z][a-z0-9_-]*)=([a-z0-9_-]+)/gi;
 // Tags that must preserve literal \n instead of converting to <br>
-const PRESERVE_WHITESPACE_TAGS = new Set(['code', 'pre']);
+const PRESERVE_WHITESPACE_TAGS = new Set(['code']);
 /**
- * Converts markup string → editor-safe innerHTML.
+ * Converts markup string -> editor-safe innerHTML.
  * Each tagged span carries data-tag (always the canonical short form)
  * so displayToMarkup can round-trip it.
- * Inside code/pre spans, \n is kept as a literal newline (white-space: pre handles it).
- * Outside those spans, \n is converted to <br>.
+ * Inside code spans, \n is kept as a literal newline (white-space: pre handles it).
+ * Outside code spans, \n is converted to <br>.
  */
 export function markupToEditorHTML(markup) {
     // First escape HTML entities
@@ -16,33 +17,51 @@ export function markupToEditorHTML(markup) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-    // Process tag by tag, tracking whether we're inside a whitespace-preserving tag
     let result = '';
     let lastIndex = 0;
     let insidePreserve = false;
-    const re = new RegExp(`\\[(\\/?(${TAG_NAMES}))\\]`, 'g');
     let match;
-    while ((match = re.exec(escaped)) !== null) {
+    while ((match = TAG_RE.exec(escaped)) !== null) {
+        const [raw, slash, rawTag, rawAttrs] = match;
         const before = escaped.slice(lastIndex, match.index);
-        // convert newlines in the text segment based on current context
         result += insidePreserve ? before : before.replace(/\n/g, '<br>');
-        const full = match[1];
-        if (full.startsWith('/')) {
-            const closingTag = canonicalTag(full.slice(1));
-            if (PRESERVE_WHITESPACE_TAGS.has(closingTag))
+        const tag = canonicalTag(rawTag.toLowerCase());
+        if (!TAGS[tag]) {
+            result += raw;
+            lastIndex = match.index + raw.length;
+            continue;
+        }
+        if (slash) {
+            if (PRESERVE_WHITESPACE_TAGS.has(tag))
                 insidePreserve = false;
             result += '</span>';
         }
         else {
-            const tag = canonicalTag(full);
             if (PRESERVE_WHITESPACE_TAGS.has(tag))
                 insidePreserve = true;
-            result += `<span data-tag="${tag}">`;
+            result += buildOpenSpan(tag, rawAttrs);
         }
-        lastIndex = match.index + match[0].length;
+        lastIndex = match.index + raw.length;
     }
-    // remaining text after last tag
     const tail = escaped.slice(lastIndex);
     result += insidePreserve ? tail : tail.replace(/\n/g, '<br>');
     return result;
+}
+function buildOpenSpan(tag, rawAttrs) {
+    if (tag !== 'code')
+        return `<span data-tag="${tag}">`;
+    const lg = parseCodeLg(rawAttrs);
+    const lgAttr = lg ? ` data-lg="${lg}"` : '';
+    return `<span data-tag="code"${lgAttr} spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off">`;
+}
+function parseCodeLg(rawAttrs) {
+    if (!rawAttrs)
+        return undefined;
+    let match;
+    ATTR_RE.lastIndex = 0;
+    while ((match = ATTR_RE.exec(rawAttrs)) !== null) {
+        if (match[1].toLowerCase() === 'lg')
+            return sanitiseCodeLanguage(match[2]);
+    }
+    return undefined;
 }

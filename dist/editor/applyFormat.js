@@ -1,4 +1,5 @@
-const PRESERVE_WHITESPACE_TAGS = new Set(['code', 'pre']);
+const PRESERVE_WHITESPACE_TAGS = new Set(['code']);
+const BLOCK_BREAK_TAGS = new Set(['DIV', 'P', 'LI']);
 export function applyFormat(tag) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed)
@@ -21,6 +22,12 @@ export function applyFormat(tag) {
     range.deleteContents();
     const wrapper = document.createElement('span');
     wrapper.dataset.tag = tag;
+    if (tag === 'code') {
+        wrapper.setAttribute('spellcheck', 'false');
+        wrapper.setAttribute('autocorrect', 'off');
+        wrapper.setAttribute('autocapitalize', 'off');
+        wrapper.setAttribute('autocomplete', 'off');
+    }
     wrapper.textContent = text;
     range.insertNode(wrapper);
     cleanEmptySpans(wrapper.parentElement);
@@ -29,14 +36,19 @@ export function applyFormat(tag) {
     sel.removeAllRanges();
     sel.addRange(newRange);
 }
-/** Walk a DOM fragment extracting text, converting <br> to \n. */
+/** Walk a DOM fragment extracting text, converting line-break elements to \n. */
 function extractTextPreserving(node) {
     if (node.nodeType === Node.TEXT_NODE)
         return node.textContent ?? '';
-    if (node.nodeType === Node.ELEMENT_NODE) {
-        if (node.tagName === 'BR')
-            return '\n';
+    if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
         return Array.from(node.childNodes).map(extractTextPreserving).join('');
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node;
+        if (el.tagName === 'BR')
+            return '\n';
+        const children = Array.from(el.childNodes).map(extractTextPreserving).join('');
+        return BLOCK_BREAK_TAGS.has(el.tagName) ? `${children}\n` : children;
     }
     return '';
 }

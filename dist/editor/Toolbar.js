@@ -1,21 +1,22 @@
 'use client';
-import { jsx as _jsx } from "react/jsx-runtime";
-import { useCallback } from 'react';
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useCallback, useState } from 'react';
 import { applyFormat } from './applyFormat';
 const BUTTONS = [
-    { label: 'B', tag: 'b', title: 'Bold — wrap selected text in bold', style: { fontWeight: 'bold' } },
-    { label: 'I', tag: 'i', title: 'Italic — wrap selected text in italic', style: { fontStyle: 'italic' } },
-    { label: 'U', tag: 'u', title: 'Underline — wrap selected text with underline', style: { textDecoration: 'underline' } },
-    { label: 'S', tag: 's', title: 'Strikethrough — draw a line through selected text', style: { textDecoration: 'line-through' } },
-    { label: 'T', tag: 't', title: 'Title — large display heading for the document' },
-    { label: 'H1', tag: 'h1', title: 'Heading 1 — largest section heading' },
-    { label: 'H2', tag: 'h2', title: 'Heading 2 — medium section heading' },
-    { label: 'H3', tag: 'h3', title: 'Heading 3 — small section heading' },
-    { label: 'HL', tag: 'hl', title: 'Highlight — mark selected text with a highlight colour' },
-    { label: 'Q', tag: 'q', title: 'Quote — indent selected text as a block quote' },
-    { label: '</>', tag: 'code', title: 'Code — format selected text as inline code', style: { fontFamily: 'monospace', fontSize: '0.85em' } },
+    { label: 'B', tag: 'b', tooltip: 'Bold', style: { fontWeight: 'bold' } },
+    { label: 'I', tag: 'i', tooltip: 'Italic', style: { fontStyle: 'italic' } },
+    { label: 'U', tag: 'u', tooltip: 'Underline', style: { textDecoration: 'underline' } },
+    { label: 'S', tag: 's', tooltip: 'Strikethrough', style: { textDecoration: 'line-through' } },
+    { label: 'T', tag: 't', tooltip: 'Title' },
+    { label: 'H1', tag: 'h1', tooltip: 'Heading 1' },
+    { label: 'H2', tag: 'h2', tooltip: 'Heading 2' },
+    { label: 'H3', tag: 'h3', tooltip: 'Heading 3' },
+    { label: 'HL', tag: 'hl', tooltip: 'Highlight' },
+    { label: 'Q', tag: 'q', tooltip: 'Quote' },
+    { label: '</>', tag: 'code', tooltip: 'Code', style: { fontFamily: 'monospace', fontSize: '0.85em' } },
 ];
 export function Toolbar({ editorRef, onFormat, currentTheme }) {
+    const [activeTooltip, setActiveTooltip] = useState(null);
     const handleClick = useCallback((tag) => {
         const el = editorRef.current;
         if (!el)
@@ -31,15 +32,31 @@ export function Toolbar({ editorRef, onFormat, currentTheme }) {
             padding: '4px 0',
             borderBottom: `1px solid ${currentTheme.border}`,
             marginBottom: '4px',
-        }, children: BUTTONS.map(({ label, tag, title, style }) => (_jsx("button", { type: "button", title: title, onMouseDown: e => e.preventDefault(), onClick: () => handleClick(tag), style: {
-                padding: '2px 8px',
-                cursor: 'pointer',
-                background: currentTheme.shade,
-                color: currentTheme.text,
-                border: `1px solid ${currentTheme.border}`,
-                borderRadius: '3px',
-                fontSize: '0.85em',
-                lineHeight: '1.4',
-                ...style,
-            }, children: label }, tag))) }));
+        }, children: BUTTONS.map(({ label, tag, tooltip, style }) => (_jsxs("div", { style: { position: 'relative', display: 'inline-block' }, onMouseEnter: () => setActiveTooltip(tag), onMouseLeave: () => setActiveTooltip(null), children: [activeTooltip === tag && (_jsx("div", { style: {
+                        position: 'absolute',
+                        bottom: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        marginBottom: '5px',
+                        padding: '3px 8px',
+                        background: currentTheme.foreground,
+                        color: currentTheme.highlight,
+                        border: `1px solid ${currentTheme.border}`,
+                        borderRadius: '3px',
+                        fontSize: '0.75em',
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        zIndex: 100,
+                    }, children: tooltip })), _jsx("button", { type: "button", onMouseDown: e => e.preventDefault(), onClick: () => handleClick(tag), style: {
+                        padding: '2px 8px',
+                        cursor: 'pointer',
+                        background: currentTheme.shade,
+                        color: currentTheme.text,
+                        border: `1px solid ${currentTheme.border}`,
+                        borderRadius: '3px',
+                        fontSize: '0.85em',
+                        lineHeight: '1.4',
+                        ...style,
+                    }, children: label })] }, tag))) }));
 }

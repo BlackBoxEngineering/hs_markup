@@ -180,14 +180,28 @@ export function HsMarkupEditor({
     if (e.key === 'Enter') {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
         let node: Node | null = sel.anchorNode;
+        let insideCode = false;
         while (node && node !== ref.current) {
           if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).dataset?.tag === 'code') {
-            e.preventDefault();
-            document.execCommand('insertText', false, '\n');
-            return;
+            insideCode = true;
+            break;
           }
           node = node.parentNode;
+        }
+
+        if (insideCode) {
+          e.preventDefault();
+          range.deleteContents();
+          const newline = document.createTextNode('\n');
+          range.insertNode(newline);
+          range.setStartAfter(newline);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          emitMarkup();
+          return;
         }
       }
     }
@@ -198,7 +212,7 @@ export function HsMarkupEditor({
     };
     const cmd = map[e.key.toLowerCase()];
     if (cmd) { e.preventDefault(); commands[cmd](); rerenderAndEmit(); }
-  }, [rerenderAndEmit]);
+  }, [emitMarkup, rerenderAndEmit]);
 
   const handleLanguageChange = useCallback((nextLanguage: string) => {
     const codeEl = activeCodeBlock;

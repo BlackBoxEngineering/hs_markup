@@ -9,7 +9,7 @@ export function displayToMarkup(el: HTMLElement): string {
 
 function nodeToMarkup(node: Node, isRoot = false): string {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ?? '';
+    return normaliseNewlines(node.textContent ?? '');
   }
 
   if (node.nodeType !== Node.ELEMENT_NODE) return '';
@@ -32,6 +32,10 @@ function nodeToMarkup(node: Node, isRoot = false): string {
   if (!isRoot && BLOCK_BREAK_TAGS.has(el.tagName)) return `${children}\n`;
 
   return children;
+}
+
+function normaliseNewlines(text: string): string {
+  return text.replace(/\r\n?/g, '\n');
 }
 
 function serialiseAllowedAttrs(tag: string, el: HTMLElement): string {

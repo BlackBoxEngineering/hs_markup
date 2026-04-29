@@ -16,6 +16,7 @@ const PRESERVE_WHITESPACE_TAGS = new Set(['code']);
  * Outside code spans, \n is converted to <br>.
  */
 export function markupToEditorHTML(markup: string): string {
+  const normalisedMarkup = normaliseNewlines(markup);
   let result = '';
   let lastIndex = 0;
   let insidePreserve = false;
@@ -23,9 +24,9 @@ export function markupToEditorHTML(markup: string): string {
 
   let match: RegExpExecArray | null;
   TAG_RE.lastIndex = 0;
-  while ((match = TAG_RE.exec(markup)) !== null) {
+  while ((match = TAG_RE.exec(normalisedMarkup)) !== null) {
     const [raw, slash, rawTag, rawAttrs] = match;
-    const before = markup.slice(lastIndex, match.index);
+    const before = normalisedMarkup.slice(lastIndex, match.index);
     if (insidePreserve && currentCodeLanguage) {
       result += highlightCodeAsHTML(before, currentCodeLanguage);
     } else if (insidePreserve) {
@@ -58,7 +59,7 @@ export function markupToEditorHTML(markup: string): string {
     lastIndex = match.index + raw.length;
   }
 
-  const tail = markup.slice(lastIndex);
+  const tail = normalisedMarkup.slice(lastIndex);
   if (insidePreserve && currentCodeLanguage) {
     result += highlightCodeAsHTML(tail, currentCodeLanguage);
   } else if (insidePreserve) {
@@ -68,6 +69,10 @@ export function markupToEditorHTML(markup: string): string {
   }
 
   return result;
+}
+
+function normaliseNewlines(text: string): string {
+  return text.replace(/\r\n?/g, '\n');
 }
 
 function buildOpenSpan(tag: string, rawAttrs: string | undefined): string {

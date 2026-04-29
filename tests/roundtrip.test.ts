@@ -120,4 +120,9 @@ describe('round-trip: markup → editor DOM → markup', () => {
   it('code language attribute is dropped for non-allowlisted values', () => {
     expect(roundTrip('[code lg=rust]let x = 1;[/code]')).toBe('[code]let x = 1;[/code]');
   });
+
+  it('normalises CRLF line endings inside code blocks', () => {
+    const input = '[code lg=js]const a = 1;\r\nconst b = 2;\r\n[/code]';
+    expect(roundTrip(input)).toBe('[code lg=js]const a = 1;\nconst b = 2;\n[/code]');
+  });
 });

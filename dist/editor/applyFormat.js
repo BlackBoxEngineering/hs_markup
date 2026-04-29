@@ -1,10 +1,10 @@
+const PRESERVE_WHITESPACE_TAGS = new Set(['code', 'pre']);
 export function applyFormat(tag) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed)
         return;
     const range = sel.getRangeAt(0);
-    const text = range.toString();
-    if (!text)
+    if (range.toString() === '' && !PRESERVE_WHITESPACE_TAGS.has(tag))
         return;
     // toggle: if entire selection is inside a span with the same tag, unwrap it
     const existing = findWrappingTag(range, tag);
@@ -12,20 +12,33 @@ export function applyFormat(tag) {
         unwrapSpan(existing);
         return;
     }
-    // extract as flat text, delete range, insert clean span
-    // this safely handles cross-boundary selections
-    range.deleteContents();
+    // extract DOM fragment — preserves structure including <br> nodes
+    const fragment = range.extractContents();
+    const text = PRESERVE_WHITESPACE_TAGS.has(tag)
+        ? extractTextPreserving(fragment)
+        : fragment.textContent ?? '';
     const wrapper = document.createElement('span');
     wrapper.dataset.tag = tag;
     wrapper.textContent = text;
     range.insertNode(wrapper);
-    // clean up: remove any empty nodes left by deleteContents
+    // clean up empty nodes left behind
     cleanEmptySpans(wrapper.parentElement);
     // restore selection to wrapped content
     const newRange = document.createRange();
     newRange.selectNodeContents(wrapper);
     sel.removeAllRanges();
     sel.addRange(newRange);
+}
+/** Walk a DOM fragment extracting text, converting <br> to \n. */
+function extractTextPreserving(node) {
+    if (node.nodeType === Node.TEXT_NODE)
+        return node.textContent ?? '';
+    if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.tagName === 'BR')
+            return '\n';
+        return Array.from(node.childNodes).map(extractTextPreserving).join('');
+    }
+    return '';
 }
 /** Find an ancestor span[data-tag] matching `tag` that contains the entire range. */
 function findWrappingTag(range, tag) {

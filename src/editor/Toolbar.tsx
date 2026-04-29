@@ -10,15 +10,18 @@ type ToolbarProps = {
   currentTheme: Theme;
 };
 
-const BUTTONS: { label: string; tag: string; style?: React.CSSProperties }[] = [
-  { label: 'B',    tag: 'b',    style: { fontWeight: 'bold' } },
-  { label: 'I',    tag: 'i',    style: { fontStyle: 'italic' } },
-  { label: 'U',    tag: 'u',    style: { textDecoration: 'underline' } },
-  { label: 'T',    tag: 't' },
-  { label: 'H',    tag: 'h' },
-  { label: 'Q',    tag: 'q' },
-  { label: 'HL',   tag: 'hl' },
-  { label: '</>',  tag: 'code', style: { fontFamily: 'monospace', fontSize: '0.85em' } },
+const BUTTONS: { label: string; tag: string; title: string; style?: React.CSSProperties }[] = [
+  { label: 'B',    tag: 'b',    title: 'Bold — wrap selected text in bold',                  style: { fontWeight: 'bold' } },
+  { label: 'I',    tag: 'i',    title: 'Italic — wrap selected text in italic',               style: { fontStyle: 'italic' } },
+  { label: 'U',    tag: 'u',    title: 'Underline — wrap selected text with underline',       style: { textDecoration: 'underline' } },
+  { label: 'S',    tag: 's',    title: 'Strikethrough — draw a line through selected text',   style: { textDecoration: 'line-through' } },
+  { label: 'T',    tag: 't',    title: 'Title — large display heading for the document' },
+  { label: 'H1',   tag: 'h1',   title: 'Heading 1 — largest section heading' },
+  { label: 'H2',   tag: 'h2',   title: 'Heading 2 — medium section heading' },
+  { label: 'H3',   tag: 'h3',   title: 'Heading 3 — small section heading' },
+  { label: 'HL',   tag: 'hl',   title: 'Highlight — mark selected text with a highlight colour' },
+  { label: 'Q',    tag: 'q',    title: 'Quote — indent selected text as a block quote' },
+  { label: '</>',  tag: 'code', title: 'Code — format selected text as inline code',         style: { fontFamily: 'monospace', fontSize: '0.85em' } },
 ];
 
 export function Toolbar({ editorRef, onFormat, currentTheme }: ToolbarProps) {
@@ -41,10 +44,11 @@ export function Toolbar({ editorRef, onFormat, currentTheme }: ToolbarProps) {
         marginBottom: '4px',
       }}
     >
-      {BUTTONS.map(({ label, tag, style }) => (
+      {BUTTONS.map(({ label, tag, title, style }) => (
         <button
           key={tag}
           type="button"
+          title={title}
           onMouseDown={e => e.preventDefault()}
           onClick={() => handleClick(tag)}
           style={{

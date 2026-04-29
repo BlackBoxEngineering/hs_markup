@@ -101,12 +101,17 @@ export const editorCSS = `
     margin-bottom: 0.25em;
   }
   [data-hs-editor] [data-tag="code"] {
+    display: block;
     font-family: 'Fira Code', 'Courier New', monospace;
-    background: var(--hs-shade);
-    padding: 0 0.25em;
-    border-radius: 3px;
+    background: #2d2d2d;
+    color: #f8f8f2;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
     font-size: 0.9em;
     font-weight: normal;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 0.5em 0;
   }
   [data-hs-editor] [data-tag="pre"] {
     display: block;

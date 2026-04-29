@@ -35,7 +35,7 @@ export function HsMarkupEditor({
   const lastValue = useRef(content);
   const [activeCodeBlock, setActiveCodeBlock] = useState<HTMLElement | null>(null);
   const [codeLanguage, setCodeLanguage] = useState<string>('');
-  const [langPosition, setLangPosition] = useState<{ top: number; right: number } | null>(null);
+  const [langPosition, setLangPosition] = useState<{ top: number; right: number; compact: boolean } | null>(null);
 
   // inject scoped styles once
   useEffect(() => {
@@ -104,9 +104,13 @@ export function HsMarkupEditor({
     setCodeLanguage(found.dataset.lg ?? '');
     const editorRect = root.getBoundingClientRect();
     const codeRect = found.getBoundingClientRect();
-    const right = Math.max(8, editorRect.right - codeRect.right + 8);
-    const top = Math.max(6, codeRect.top - editorRect.top + 6);
-    setLangPosition({ top, right });
+    const parentTopOffset = root.offsetTop;
+    const compact = window.innerWidth <= 640;
+    const rightOffset = compact ? 4 : 8;
+    const topOffset = compact ? 2 : 4;
+    const right = Math.max(rightOffset, editorRect.right - codeRect.right + rightOffset);
+    const top = Math.max(topOffset, parentTopOffset + (codeRect.top - editorRect.top) + topOffset);
+    setLangPosition({ top, right, compact });
   }, []);
 
   useEffect(() => {
@@ -200,8 +204,8 @@ export function HsMarkupEditor({
             background: '#2d2d2d',
             border: `1px solid ${currentTheme.border}`,
             borderRadius: '4px',
-            padding: '2px 6px',
-            fontSize: '0.75em',
+            padding: langPosition.compact ? '1px 4px' : '2px 6px',
+            fontSize: langPosition.compact ? '0.68em' : '0.75em',
             fontFamily: 'monospace',
           }}
         >
@@ -215,8 +219,8 @@ export function HsMarkupEditor({
               color: '#f8f8f2',
               border: `1px solid ${currentTheme.border}`,
               borderRadius: '3px',
-              fontSize: '0.9em',
-              padding: '1px 4px',
+              fontSize: langPosition.compact ? '0.82em' : '0.9em',
+              padding: langPosition.compact ? '0 3px' : '1px 4px',
             }}
           >
             <option value="">none</option>

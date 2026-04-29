@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { applyFormat } from './applyFormat';
 import type { Theme } from '../theme';
 import { CODE_LANGUAGES } from '../language/codeLang';
+import { sanitiseCodeLanguage } from '../language/codeLang';
 
 type ToolbarProps = {
   editorRef: React.RefObject<HTMLDivElement | null>;
@@ -28,6 +29,38 @@ const BUTTONS: { label: string; tag: string; tooltip: string; style?: React.CSSP
 export function Toolbar({ editorRef, onFormat, currentTheme }: ToolbarProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [codeLanguage, setCodeLanguage] = useState<string>('');
+  const [activeCodeBlock, setActiveCodeBlock] = useState<HTMLElement | null>(null);
+
+  const findActiveCodeBlock = useCallback((): HTMLElement | null => {
+    const root = editorRef.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0) return null;
+
+    const node = sel.anchorNode;
+    if (!node || !root.contains(node)) return null;
+
+    let current: Node | null = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+    while (current && current !== root) {
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        const el = current as HTMLElement;
+        if (el.dataset?.tag === 'code') return el;
+      }
+      current = current.parentNode;
+    }
+    return null;
+  }, [editorRef]);
+
+  useEffect(() => {
+    const syncActiveCode = () => {
+      const codeEl = findActiveCodeBlock();
+      setActiveCodeBlock(codeEl);
+      setCodeLanguage(codeEl?.dataset.lg ?? '');
+    };
+
+    document.addEventListener('selectionchange', syncActiveCode);
+    syncActiveCode();
+    return () => document.removeEventListener('selectionchange', syncActiveCode);
+  }, [findActiveCodeBlock]);
 
   const handleClick = useCallback((tag: string) => {
     const el = editorRef.current;
@@ -36,6 +69,21 @@ export function Toolbar({ editorRef, onFormat, currentTheme }: ToolbarProps) {
     applyFormat(tag, tag === 'code' ? { codeLanguage } : undefined);
     onFormat();
   }, [editorRef, onFormat, codeLanguage]);
+
+  const handleLanguageChange = useCallback((nextLanguage: string) => {
+    const codeEl = activeCodeBlock;
+    if (!codeEl) return;
+
+    const lg = sanitiseCodeLanguage(nextLanguage);
+    if (lg) {
+      codeEl.dataset.lg = lg;
+    } else {
+      delete codeEl.dataset.lg;
+    }
+
+    setCodeLanguage(lg ?? '');
+    onFormat();
+  }, [activeCodeBlock, onFormat]);
 
   return (
     <div
@@ -98,36 +146,38 @@ export function Toolbar({ editorRef, onFormat, currentTheme }: ToolbarProps) {
           </button>
         </div>
       ))}
-      <label
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          color: currentTheme.text,
-          fontSize: '0.8em',
-          marginLeft: '4px',
-        }}
-      >
-        Lang
-        <select
-          value={codeLanguage}
-          onChange={e => setCodeLanguage(e.target.value)}
-          onMouseDown={e => e.stopPropagation()}
+      {activeCodeBlock && (
+        <label
           style={{
-            background: currentTheme.shade,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
             color: currentTheme.text,
-            border: `1px solid ${currentTheme.border}`,
-            borderRadius: '3px',
-            fontSize: '0.9em',
-            padding: '1px 4px',
+            fontSize: '0.8em',
+            marginLeft: '4px',
           }}
         >
-          <option value="">none</option>
-          {Array.from(CODE_LANGUAGES).map(lang => (
-            <option key={lang} value={lang}>{lang}</option>
-          ))}
-        </select>
-      </label>
+          Lang
+          <select
+            value={codeLanguage}
+            onChange={e => handleLanguageChange(e.target.value)}
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              background: currentTheme.shade,
+              color: currentTheme.text,
+              border: `1px solid ${currentTheme.border}`,
+              borderRadius: '3px',
+              fontSize: '0.9em',
+              padding: '1px 4px',
+            }}
+          >
+            <option value="">none</option>
+            {Array.from(CODE_LANGUAGES).map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   );
 }

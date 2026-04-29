@@ -1,8 +1,9 @@
 'use client';
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { applyFormat } from './applyFormat';
 import { CODE_LANGUAGES } from '../language/codeLang';
+import { sanitiseCodeLanguage } from '../language/codeLang';
 const BUTTONS = [
     { label: 'B', tag: 'b', tooltip: 'Bold', style: { fontWeight: 'bold' } },
     { label: 'I', tag: 'i', tooltip: 'Italic', style: { fontStyle: 'italic' } },
@@ -19,6 +20,36 @@ const BUTTONS = [
 export function Toolbar({ editorRef, onFormat, currentTheme }) {
     const [activeTooltip, setActiveTooltip] = useState(null);
     const [codeLanguage, setCodeLanguage] = useState('');
+    const [activeCodeBlock, setActiveCodeBlock] = useState(null);
+    const findActiveCodeBlock = useCallback(() => {
+        const root = editorRef.current;
+        const sel = window.getSelection();
+        if (!root || !sel || sel.rangeCount === 0)
+            return null;
+        const node = sel.anchorNode;
+        if (!node || !root.contains(node))
+            return null;
+        let current = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+        while (current && current !== root) {
+            if (current.nodeType === Node.ELEMENT_NODE) {
+                const el = current;
+                if (el.dataset?.tag === 'code')
+                    return el;
+            }
+            current = current.parentNode;
+        }
+        return null;
+    }, [editorRef]);
+    useEffect(() => {
+        const syncActiveCode = () => {
+            const codeEl = findActiveCodeBlock();
+            setActiveCodeBlock(codeEl);
+            setCodeLanguage(codeEl?.dataset.lg ?? '');
+        };
+        document.addEventListener('selectionchange', syncActiveCode);
+        syncActiveCode();
+        return () => document.removeEventListener('selectionchange', syncActiveCode);
+    }, [findActiveCodeBlock]);
     const handleClick = useCallback((tag) => {
         const el = editorRef.current;
         if (!el)
@@ -27,6 +58,20 @@ export function Toolbar({ editorRef, onFormat, currentTheme }) {
         applyFormat(tag, tag === 'code' ? { codeLanguage } : undefined);
         onFormat();
     }, [editorRef, onFormat, codeLanguage]);
+    const handleLanguageChange = useCallback((nextLanguage) => {
+        const codeEl = activeCodeBlock;
+        if (!codeEl)
+            return;
+        const lg = sanitiseCodeLanguage(nextLanguage);
+        if (lg) {
+            codeEl.dataset.lg = lg;
+        }
+        else {
+            delete codeEl.dataset.lg;
+        }
+        setCodeLanguage(lg ?? '');
+        onFormat();
+    }, [activeCodeBlock, onFormat]);
     return (_jsxs("div", { style: {
             display: 'flex',
             gap: '4px',
@@ -60,19 +105,19 @@ export function Toolbar({ editorRef, onFormat, currentTheme }) {
                             fontSize: '0.85em',
                             lineHeight: '1.4',
                             ...style,
-                        }, children: label })] }, tag))), _jsxs("label", { style: {
+                        }, children: label })] }, tag))), activeCodeBlock && (_jsxs("label", { style: {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
                     color: currentTheme.text,
                     fontSize: '0.8em',
                     marginLeft: '4px',
-                }, children: ["Lang", _jsxs("select", { value: codeLanguage, onChange: e => setCodeLanguage(e.target.value), onMouseDown: e => e.stopPropagation(), style: {
+                }, children: ["Lang", _jsxs("select", { value: codeLanguage, onChange: e => handleLanguageChange(e.target.value), onMouseDown: e => e.stopPropagation(), style: {
                             background: currentTheme.shade,
                             color: currentTheme.text,
                             border: `1px solid ${currentTheme.border}`,
                             borderRadius: '3px',
                             fontSize: '0.9em',
                             padding: '1px 4px',
-                        }, children: [_jsx("option", { value: "", children: "none" }), Array.from(CODE_LANGUAGES).map(lang => (_jsx("option", { value: lang, children: lang }, lang)))] })] })] }));
+                        }, children: [_jsx("option", { value: "", children: "none" }), Array.from(CODE_LANGUAGES).map(lang => (_jsx("option", { value: lang, children: lang }, lang)))] })] }))] }));
 }

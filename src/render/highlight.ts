@@ -68,12 +68,42 @@ function buildRules(lang: string): Rule[] {
   }
 }
 
-function tokenise(code: string, lang: string): { type: TokenType | 'plain'; text: string }[] {
-  const rules = buildRules(lang);
-  if (!rules.length) return [{ type: 'plain', text: code }];
+/** Count capture groups in a regex source (static, called once per rule set). */
+function countGroups(source: string): number {
+  return new RegExp(`${source}|`).exec('')!.length - 1;
+}
 
-  // build a combined regex with named-ish groups via alternation order
+type CompiledLang = { combined: RegExp; types: TokenType[]; offsets: number[] };
+const langCache = new Map<string, CompiledLang>();
+
+function compile(lang: string): CompiledLang | null {
+  const cached = langCache.get(lang);
+  if (cached) return cached;
+
+  const rules = buildRules(lang);
+  if (!rules.length) return null;
+
+  const types: TokenType[] = [];
+  const offsets: number[] = [];
+  let offset = 1;
+  for (const [type, re] of rules) {
+    types.push(type);
+    offsets.push(offset);
+    offset += countGroups(re.source);
+  }
+
   const combined = new RegExp(rules.map(([, re]) => re.source).join('|'), 'gm');
+  const result = { combined, types, offsets };
+  langCache.set(lang, result);
+  return result;
+}
+
+function tokenise(code: string, lang: string): { type: TokenType | 'plain'; text: string }[] {
+  const compiled = compile(lang);
+  if (!compiled) return [{ type: 'plain', text: code }];
+
+  const { combined, types, offsets } = compiled;
+  combined.lastIndex = 0;
   const tokens: { type: TokenType | 'plain'; text: string }[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -83,19 +113,13 @@ function tokenise(code: string, lang: string): { type: TokenType | 'plain'; text
       tokens.push({ type: 'plain', text: code.slice(lastIndex, match.index) });
     }
 
-    // figure out which rule matched by checking capture groups
-    let groupIdx = 1;
-    let matchedType: TokenType = 'kw';
-    for (const [type, re] of rules) {
-      const groupCount = new RegExp(`${re.source}|`).exec('')!.length - 1;
-      for (let g = 0; g < groupCount; g++) {
-        if (match[groupIdx + g] !== undefined) {
-          matchedType = type;
-          break;
-        }
+    // find which rule matched by checking precomputed group offsets
+    let matchedType: TokenType = types[0];
+    for (let r = 0; r < offsets.length; r++) {
+      if (match[offsets[r]] !== undefined) {
+        matchedType = types[r];
+        break;
       }
-      if (match[groupIdx] !== undefined) break;
-      groupIdx += groupCount;
     }
 
     tokens.push({ type: matchedType, text: match[0] });

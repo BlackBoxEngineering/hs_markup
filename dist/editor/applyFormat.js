@@ -1,6 +1,7 @@
+import { sanitiseCodeLanguage } from '../language/codeLang';
 const PRESERVE_WHITESPACE_TAGS = new Set(['code']);
 const BLOCK_BREAK_TAGS = new Set(['DIV', 'P', 'LI']);
-export function applyFormat(tag) {
+export function applyFormat(tag, options) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed)
         return;
@@ -23,6 +24,9 @@ export function applyFormat(tag) {
     const wrapper = document.createElement('span');
     wrapper.dataset.tag = tag;
     if (tag === 'code') {
+        const lg = sanitiseCodeLanguage(options?.codeLanguage);
+        if (lg)
+            wrapper.dataset.lg = lg;
         wrapper.setAttribute('spellcheck', 'false');
         wrapper.setAttribute('autocorrect', 'off');
         wrapper.setAttribute('autocapitalize', 'off');

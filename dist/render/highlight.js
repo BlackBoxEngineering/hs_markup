@@ -60,12 +60,37 @@ function buildRules(lang) {
             return [];
     }
 }
-function tokenise(code, lang) {
+/** Count capture groups in a regex source (static, called once per rule set). */
+function countGroups(source) {
+    return new RegExp(`${source}|`).exec('').length - 1;
+}
+const langCache = new Map();
+function compile(lang) {
+    const cached = langCache.get(lang);
+    if (cached)
+        return cached;
     const rules = buildRules(lang);
     if (!rules.length)
-        return [{ type: 'plain', text: code }];
-    // build a combined regex with named-ish groups via alternation order
+        return null;
+    const types = [];
+    const offsets = [];
+    let offset = 1;
+    for (const [type, re] of rules) {
+        types.push(type);
+        offsets.push(offset);
+        offset += countGroups(re.source);
+    }
     const combined = new RegExp(rules.map(([, re]) => re.source).join('|'), 'gm');
+    const result = { combined, types, offsets };
+    langCache.set(lang, result);
+    return result;
+}
+function tokenise(code, lang) {
+    const compiled = compile(lang);
+    if (!compiled)
+        return [{ type: 'plain', text: code }];
+    const { combined, types, offsets } = compiled;
+    combined.lastIndex = 0;
     const tokens = [];
     let lastIndex = 0;
     let match;
@@ -73,20 +98,13 @@ function tokenise(code, lang) {
         if (match.index > lastIndex) {
             tokens.push({ type: 'plain', text: code.slice(lastIndex, match.index) });
         }
-        // figure out which rule matched by checking capture groups
-        let groupIdx = 1;
-        let matchedType = 'kw';
-        for (const [type, re] of rules) {
-            const groupCount = new RegExp(`${re.source}|`).exec('').length - 1;
-            for (let g = 0; g < groupCount; g++) {
-                if (match[groupIdx + g] !== undefined) {
-                    matchedType = type;
-                    break;
-                }
-            }
-            if (match[groupIdx] !== undefined)
+        // find which rule matched by checking precomputed group offsets
+        let matchedType = types[0];
+        for (let r = 0; r < offsets.length; r++) {
+            if (match[offsets[r]] !== undefined) {
+                matchedType = types[r];
                 break;
-            groupIdx += groupCount;
+            }
         }
         tokens.push({ type: matchedType, text: match[0] });
         lastIndex = match.index + match[0].length;

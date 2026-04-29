@@ -133,6 +133,10 @@ function tokenise(code: string, lang: string): { type: TokenType | 'plain'; text
   return tokens;
 }
 
+export function tokeniseCode(code: string, lang: string): { type: TokenType | 'plain'; text: string }[] {
+  return tokenise(code, lang);
+}
+
 export function highlightCode(code: string, lang: string): React.ReactNode[] {
   const tokens = tokenise(code, lang);
   return tokens.map((tok, i) => {

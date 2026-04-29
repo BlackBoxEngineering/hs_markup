@@ -1,5 +1,6 @@
 import { TAGS, canonicalTag } from '../language/tags';
 import { sanitiseCodeLanguage } from '../language/codeLang';
+import { tokeniseCode } from '../render/highlight';
 
 const TAG_RE = /\[(\/?)([a-z0-9]+)(?:\s+([^\]]+))?\]/gi;
 const ATTR_RE = /([a-z][a-z0-9_-]*)=([a-z0-9_-]+)/gi;
@@ -15,42 +16,56 @@ const PRESERVE_WHITESPACE_TAGS = new Set(['code']);
  * Outside code spans, \n is converted to <br>.
  */
 export function markupToEditorHTML(markup: string): string {
-  // First escape HTML entities
-  const escaped = markup
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
   let result = '';
   let lastIndex = 0;
   let insidePreserve = false;
+  let currentCodeLanguage: string | undefined;
 
   let match: RegExpExecArray | null;
-  while ((match = TAG_RE.exec(escaped)) !== null) {
+  TAG_RE.lastIndex = 0;
+  while ((match = TAG_RE.exec(markup)) !== null) {
     const [raw, slash, rawTag, rawAttrs] = match;
-    const before = escaped.slice(lastIndex, match.index);
-    result += insidePreserve ? before : before.replace(/\n/g, '<br>');
+    const before = markup.slice(lastIndex, match.index);
+    if (insidePreserve && currentCodeLanguage) {
+      result += highlightCodeAsHTML(before, currentCodeLanguage);
+    } else if (insidePreserve) {
+      result += escapeHtml(before);
+    } else {
+      result += escapeHtml(before).replace(/\n/g, '<br>');
+    }
 
     const tag = canonicalTag(rawTag.toLowerCase());
     if (!TAGS[tag]) {
-      result += raw;
+      result += escapeHtml(raw);
       lastIndex = match.index + raw.length;
       continue;
     }
 
     if (slash) {
-      if (PRESERVE_WHITESPACE_TAGS.has(tag)) insidePreserve = false;
+      if (PRESERVE_WHITESPACE_TAGS.has(tag)) {
+        insidePreserve = false;
+        currentCodeLanguage = undefined;
+      }
       result += '</span>';
     } else {
-      if (PRESERVE_WHITESPACE_TAGS.has(tag)) insidePreserve = true;
+      if (PRESERVE_WHITESPACE_TAGS.has(tag)) {
+        insidePreserve = true;
+        currentCodeLanguage = parseCodeLg(rawAttrs);
+      }
       result += buildOpenSpan(tag, rawAttrs);
     }
 
     lastIndex = match.index + raw.length;
   }
 
-  const tail = escaped.slice(lastIndex);
-  result += insidePreserve ? tail : tail.replace(/\n/g, '<br>');
+  const tail = markup.slice(lastIndex);
+  if (insidePreserve && currentCodeLanguage) {
+    result += highlightCodeAsHTML(tail, currentCodeLanguage);
+  } else if (insidePreserve) {
+    result += escapeHtml(tail);
+  } else {
+    result += escapeHtml(tail).replace(/\n/g, '<br>');
+  }
 
   return result;
 }
@@ -71,4 +86,21 @@ function parseCodeLg(rawAttrs: string | undefined): string | undefined {
     if (match[1].toLowerCase() === 'lg') return sanitiseCodeLanguage(match[2]);
   }
   return undefined;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function highlightCodeAsHTML(code: string, language: string): string {
+  return tokeniseCode(code, language)
+    .map((token) => {
+      const escaped = escapeHtml(token.text);
+      if (token.type === 'plain') return escaped;
+      return `<span class="hs-hl-${token.type}">${escaped}</span>`;
+    })
+    .join('');
 }

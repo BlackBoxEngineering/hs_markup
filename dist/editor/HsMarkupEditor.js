@@ -54,6 +54,9 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         }
         isInternalChange.current = true;
         lastValue.current = markup;
+        el.innerHTML = markupToEditorHTML(markup);
+        if (preEditOffset !== null)
+            setCursorOffset(el, preEditOffset);
         onChange(markup);
     }, [onChange, maxLength]);
     const handlePaste = useCallback((e) => {

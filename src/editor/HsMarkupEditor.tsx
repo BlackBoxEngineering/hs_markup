@@ -73,6 +73,8 @@ export function HsMarkupEditor({
 
     isInternalChange.current = true;
     lastValue.current = markup;
+    el.innerHTML = markupToEditorHTML(markup);
+    if (preEditOffset !== null) setCursorOffset(el, preEditOffset);
     onChange(markup);
   }, [onChange, maxLength]);
 

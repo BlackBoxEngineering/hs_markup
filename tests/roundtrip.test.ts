@@ -14,6 +14,11 @@ function roundTrip(input: string): string {
 }
 
 describe('round-trip: markup → editor DOM → markup', () => {
+  it('injects syntax token spans in editor HTML for code blocks with language', () => {
+    const html = markupToEditorHTML('[code lg=js]const x = 1;[/code]');
+    expect(html).toContain('class="hs-hl-kw"');
+  });
+
   it('simple bold', () => {
     expect(roundTrip('[b]Hello[/b]')).toBe('[b]Hello[/b]');
   });

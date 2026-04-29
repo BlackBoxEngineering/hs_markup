@@ -114,6 +114,9 @@ function tokenise(code, lang) {
     }
     return tokens;
 }
+export function tokeniseCode(code, lang) {
+    return tokenise(code, lang);
+}
 export function highlightCode(code, lang) {
     const tokens = tokenise(code, lang);
     return tokens.map((tok, i) => {

@@ -31,8 +31,7 @@ export function HsMarkupEditor({
   className,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const isInternalChange = useRef(false);
-  const lastValue = useRef(content);
+  const lastEmitted = useRef(content);
   const [activeCodeBlock, setActiveCodeBlock] = useState<HTMLElement | null>(null);
   const [codeLanguage, setCodeLanguage] = useState<string>('');
   const [langPosition, setLangPosition] = useState<{ top: number; right: number; compact: boolean } | null>(null);
@@ -46,16 +45,13 @@ export function HsMarkupEditor({
     styleInjected = true;
   }, []);
 
-  // sync external value → DOM
+  // sync external value → DOM (only when content changes from outside)
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (isInternalChange.current) {
-      isInternalChange.current = false;
-      return;
-    }
-    if (content === lastValue.current && el.innerHTML) return;
-    lastValue.current = content;
+    // skip if this is the value we just emitted
+    if (content === lastEmitted.current && el.innerHTML) return;
+    lastEmitted.current = content;
 
     const offset = getCursorOffset(el);
     el.innerHTML = markupToEditorHTML(content);
@@ -130,26 +126,49 @@ export function HsMarkupEditor({
     };
   }, [syncActiveCode]);
 
-  const handleInput = useCallback(() => {
+  // serialise and emit — does NOT replace innerHTML
+  const emitMarkup = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    const preEditOffset = getCursorOffset(el);
     const markup = displayToMarkup(el);
 
     if (maxLength !== undefined && markup.length > maxLength) {
-      // revert — restore previous state
-      el.innerHTML = markupToEditorHTML(lastValue.current);
-      if (preEditOffset !== null) setCursorOffset(el, preEditOffset);
+      // revert to last good state
+      const offset = getCursorOffset(el);
+      el.innerHTML = markupToEditorHTML(lastEmitted.current);
+      if (offset !== null) setCursorOffset(el, Math.max(0, offset - 1));
       return;
     }
 
-    isInternalChange.current = true;
-    lastValue.current = markup;
-    el.innerHTML = markupToEditorHTML(markup);
-    if (preEditOffset !== null) setCursorOffset(el, preEditOffset);
+    lastEmitted.current = markup;
     onChange(markup);
     syncActiveCode();
   }, [onChange, maxLength, syncActiveCode]);
+
+  // full re-render: serialise → rebuild DOM → restore cursor
+  // only used after toolbar actions that mutate DOM structure
+  const rerenderAndEmit = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const offset = getCursorOffset(el);
+    const markup = displayToMarkup(el);
+
+    if (maxLength !== undefined && markup.length > maxLength) {
+      el.innerHTML = markupToEditorHTML(lastEmitted.current);
+      if (offset !== null) setCursorOffset(el, Math.max(0, offset - 1));
+      return;
+    }
+
+    lastEmitted.current = markup;
+    el.innerHTML = markupToEditorHTML(markup);
+    if (offset !== null) setCursorOffset(el, offset);
+    onChange(markup);
+    syncActiveCode();
+  }, [onChange, maxLength, syncActiveCode]);
+
+  const handleInput = useCallback(() => {
+    emitMarkup();
+  }, [emitMarkup]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
     const text = sanitisePaste(e.nativeEvent);
@@ -157,13 +176,29 @@ export function HsMarkupEditor({
   }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Enter inside a code block: insert a plain newline, not a <div>/<br>
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        let node: Node | null = sel.anchorNode;
+        while (node && node !== ref.current) {
+          if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).dataset?.tag === 'code') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '\n');
+            return;
+          }
+          node = node.parentNode;
+        }
+      }
+    }
+
     if (!e.ctrlKey && !e.metaKey) return;
     const map: Record<string, keyof typeof commands> = {
       b: 'bold', i: 'italic', u: 'underline',
     };
     const cmd = map[e.key.toLowerCase()];
-    if (cmd) { e.preventDefault(); commands[cmd](); handleInput(); }
-  }, [handleInput]);
+    if (cmd) { e.preventDefault(); commands[cmd](); rerenderAndEmit(); }
+  }, [rerenderAndEmit]);
 
   const handleLanguageChange = useCallback((nextLanguage: string) => {
     const codeEl = activeCodeBlock;
@@ -174,12 +209,12 @@ export function HsMarkupEditor({
     else delete codeEl.dataset.lg;
 
     setCodeLanguage(lg ?? '');
-    handleInput();
-  }, [activeCodeBlock, handleInput]);
+    rerenderAndEmit();
+  }, [activeCodeBlock, rerenderAndEmit]);
 
   return (
     <div className={className} style={{ ...themeVars(currentTheme), position: 'relative' }}>
-      <Toolbar editorRef={ref} onFormat={handleInput} currentTheme={currentTheme} />
+      <Toolbar editorRef={ref} onFormat={rerenderAndEmit} currentTheme={currentTheme} />
       <div
         ref={ref}
         contentEditable

@@ -12,8 +12,7 @@ import { CODE_LANGUAGES, sanitiseCodeLanguage } from '../language/codeLang';
 let styleInjected = false;
 export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, placeholder, className, }) {
     const ref = useRef(null);
-    const isInternalChange = useRef(false);
-    const lastValue = useRef(content);
+    const lastEmitted = useRef(content);
     const [activeCodeBlock, setActiveCodeBlock] = useState(null);
     const [codeLanguage, setCodeLanguage] = useState('');
     const [langPosition, setLangPosition] = useState(null);
@@ -26,18 +25,15 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         document.head.appendChild(style);
         styleInjected = true;
     }, []);
-    // sync external value → DOM
+    // sync external value → DOM (only when content changes from outside)
     useEffect(() => {
         const el = ref.current;
         if (!el)
             return;
-        if (isInternalChange.current) {
-            isInternalChange.current = false;
+        // skip if this is the value we just emitted
+        if (content === lastEmitted.current && el.innerHTML)
             return;
-        }
-        if (content === lastValue.current && el.innerHTML)
-            return;
-        lastValue.current = content;
+        lastEmitted.current = content;
         const offset = getCursorOffset(el);
         el.innerHTML = markupToEditorHTML(content);
         if (offset !== null)
@@ -103,32 +99,121 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
             root?.removeEventListener('scroll', onSelectionChange);
         };
     }, [syncActiveCode]);
-    const handleInput = useCallback(() => {
+    // serialise and emit — does NOT replace innerHTML
+    const emitMarkup = useCallback(() => {
         const el = ref.current;
         if (!el)
             return;
-        const preEditOffset = getCursorOffset(el);
         const markup = displayToMarkup(el);
         if (maxLength !== undefined && markup.length > maxLength) {
-            // revert — restore previous state
-            el.innerHTML = markupToEditorHTML(lastValue.current);
-            if (preEditOffset !== null)
-                setCursorOffset(el, preEditOffset);
+            // revert to last good state
+            const offset = getCursorOffset(el);
+            el.innerHTML = markupToEditorHTML(lastEmitted.current);
+            if (offset !== null)
+                setCursorOffset(el, Math.max(0, offset - 1));
             return;
         }
-        isInternalChange.current = true;
-        lastValue.current = markup;
-        el.innerHTML = markupToEditorHTML(markup);
-        if (preEditOffset !== null)
-            setCursorOffset(el, preEditOffset);
+        lastEmitted.current = markup;
         onChange(markup);
         syncActiveCode();
     }, [onChange, maxLength, syncActiveCode]);
+    // full re-render: serialise → rebuild DOM → restore cursor
+    // only used after toolbar actions that mutate DOM structure
+    const rerenderAndEmit = useCallback(() => {
+        const el = ref.current;
+        if (!el)
+            return;
+        const offset = getCursorOffset(el);
+        const markup = displayToMarkup(el);
+        if (maxLength !== undefined && markup.length > maxLength) {
+            el.innerHTML = markupToEditorHTML(lastEmitted.current);
+            if (offset !== null)
+                setCursorOffset(el, Math.max(0, offset - 1));
+            return;
+        }
+        lastEmitted.current = markup;
+        el.innerHTML = markupToEditorHTML(markup);
+        if (offset !== null)
+            setCursorOffset(el, offset);
+        onChange(markup);
+        syncActiveCode();
+    }, [onChange, maxLength, syncActiveCode]);
+    const handleInput = useCallback(() => {
+        emitMarkup();
+    }, [emitMarkup]);
     const handlePaste = useCallback((e) => {
         const text = sanitisePaste(e.nativeEvent);
-        document.execCommand('insertText', false, text);
-    }, []);
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0)
+            return;
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        let node = sel.anchorNode;
+        let insideCode = false;
+        while (node && node !== ref.current) {
+            if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.tag === 'code') {
+                insideCode = true;
+                break;
+            }
+            node = node.parentNode;
+        }
+        if (insideCode) {
+            const textNode = document.createTextNode(text);
+            range.insertNode(textNode);
+            range.setStartAfter(textNode);
+            range.collapse(true);
+        }
+        else {
+            const fragment = document.createDocumentFragment();
+            const lines = text.split('\n');
+            lines.forEach((line, index) => {
+                if (line.length > 0) {
+                    fragment.appendChild(document.createTextNode(line));
+                }
+                if (index < lines.length - 1) {
+                    fragment.appendChild(document.createElement('br'));
+                }
+            });
+            const endMarker = document.createTextNode('');
+            fragment.appendChild(endMarker);
+            range.insertNode(fragment);
+            range.setStartBefore(endMarker);
+            range.collapse(true);
+            endMarker.remove();
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
+        emitMarkup();
+    }, [emitMarkup]);
     const handleKeyDown = useCallback((e) => {
+        // Enter inside a code block: insert a plain newline, not a <div>/<br>
+        if (e.key === 'Enter') {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                let node = sel.anchorNode;
+                let insideCode = false;
+                while (node && node !== ref.current) {
+                    if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.tag === 'code') {
+                        insideCode = true;
+                        break;
+                    }
+                    node = node.parentNode;
+                }
+                if (insideCode) {
+                    e.preventDefault();
+                    range.deleteContents();
+                    const newline = document.createTextNode('\n');
+                    range.insertNode(newline);
+                    range.setStartAfter(newline);
+                    range.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    emitMarkup();
+                    return;
+                }
+            }
+        }
         if (!e.ctrlKey && !e.metaKey)
             return;
         const map = {
@@ -138,9 +223,9 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         if (cmd) {
             e.preventDefault();
             commands[cmd]();
-            handleInput();
+            rerenderAndEmit();
         }
-    }, [handleInput]);
+    }, [emitMarkup, rerenderAndEmit]);
     const handleLanguageChange = useCallback((nextLanguage) => {
         const codeEl = activeCodeBlock;
         if (!codeEl)
@@ -151,9 +236,9 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         else
             delete codeEl.dataset.lg;
         setCodeLanguage(lg ?? '');
-        handleInput();
-    }, [activeCodeBlock, handleInput]);
-    return (_jsxs("div", { className: className, style: { ...themeVars(currentTheme), position: 'relative' }, children: [_jsx(Toolbar, { editorRef: ref, onFormat: handleInput, currentTheme: currentTheme }), _jsx("div", { ref: ref, contentEditable: true, suppressContentEditableWarning: true, "data-hs-editor": "", "data-placeholder": placeholder, onInput: handleInput, onPaste: handlePaste, onKeyDown: handleKeyDown }), activeCodeBlock && langPosition && (_jsxs("label", { style: {
+        rerenderAndEmit();
+    }, [activeCodeBlock, rerenderAndEmit]);
+    return (_jsxs("div", { className: className, style: { ...themeVars(currentTheme), position: 'relative' }, children: [_jsx(Toolbar, { editorRef: ref, onFormat: rerenderAndEmit, currentTheme: currentTheme }), _jsx("div", { ref: ref, contentEditable: true, suppressContentEditableWarning: true, "data-hs-editor": "", "data-placeholder": placeholder, onInput: handleInput, onPaste: handlePaste, onKeyDown: handleKeyDown }), activeCodeBlock && langPosition && (_jsxs("label", { style: {
                     position: 'absolute',
                     top: `${langPosition.top}px`,
                     right: `${langPosition.right}px`,

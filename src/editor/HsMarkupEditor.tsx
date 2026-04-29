@@ -172,8 +172,51 @@ export function HsMarkupEditor({
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
     const text = sanitisePaste(e.nativeEvent);
-    document.execCommand('insertText', false, text);
-  }, []);
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    let node: Node | null = sel.anchorNode;
+    let insideCode = false;
+    while (node && node !== ref.current) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).dataset?.tag === 'code') {
+        insideCode = true;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (insideCode) {
+      const textNode = document.createTextNode(text);
+      range.insertNode(textNode);
+      range.setStartAfter(textNode);
+      range.collapse(true);
+    } else {
+      const fragment = document.createDocumentFragment();
+      const lines = text.split('\n');
+      lines.forEach((line, index) => {
+        if (line.length > 0) {
+          fragment.appendChild(document.createTextNode(line));
+        }
+        if (index < lines.length - 1) {
+          fragment.appendChild(document.createElement('br'));
+        }
+      });
+
+      const endMarker = document.createTextNode('');
+      fragment.appendChild(endMarker);
+      range.insertNode(fragment);
+      range.setStartBefore(endMarker);
+      range.collapse(true);
+      endMarker.remove();
+    }
+
+    sel.removeAllRanges();
+    sel.addRange(range);
+    emitMarkup();
+  }, [emitMarkup]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     // Enter inside a code block: insert a plain newline, not a <div>/<br>

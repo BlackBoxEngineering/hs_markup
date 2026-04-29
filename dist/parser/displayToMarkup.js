@@ -6,7 +6,7 @@ export function displayToMarkup(el) {
 }
 function nodeToMarkup(node, isRoot = false) {
     if (node.nodeType === Node.TEXT_NODE) {
-        return node.textContent ?? '';
+        return normaliseNewlines(node.textContent ?? '');
     }
     if (node.nodeType !== Node.ELEMENT_NODE)
         return '';
@@ -27,6 +27,9 @@ function nodeToMarkup(node, isRoot = false) {
     if (!isRoot && BLOCK_BREAK_TAGS.has(el.tagName))
         return `${children}\n`;
     return children;
+}
+function normaliseNewlines(text) {
+    return text.replace(/\r\n?/g, '\n');
 }
 function serialiseAllowedAttrs(tag, el) {
     if (tag !== 'code')

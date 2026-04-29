@@ -1,6 +1,6 @@
 'use client';
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { displayToMarkup } from '../parser/displayToMarkup';
 import { sanitisePaste } from './pasteSanitiser';
 import { commands } from './commands';
@@ -8,11 +8,15 @@ import { markupToEditorHTML } from './markupToEditorHTML';
 import { getCursorOffset, setCursorOffset } from './cursor';
 import { themeVars, editorCSS } from './editorStyles';
 import { Toolbar } from './Toolbar';
+import { CODE_LANGUAGES, sanitiseCodeLanguage } from '../language/codeLang';
 let styleInjected = false;
 export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, placeholder, className, }) {
     const ref = useRef(null);
     const isInternalChange = useRef(false);
     const lastValue = useRef(content);
+    const [activeCodeBlock, setActiveCodeBlock] = useState(null);
+    const [codeLanguage, setCodeLanguage] = useState('');
+    const [langPosition, setLangPosition] = useState(null);
     // inject scoped styles once
     useEffect(() => {
         if (styleInjected)
@@ -39,6 +43,61 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         if (offset !== null)
             setCursorOffset(el, offset);
     }, [content]);
+    const syncActiveCode = useCallback(() => {
+        const root = ref.current;
+        const sel = window.getSelection();
+        if (!root || !sel || sel.rangeCount === 0) {
+            setActiveCodeBlock(null);
+            setCodeLanguage('');
+            setLangPosition(null);
+            return;
+        }
+        const node = sel.anchorNode;
+        if (!node || !root.contains(node)) {
+            setActiveCodeBlock(null);
+            setCodeLanguage('');
+            setLangPosition(null);
+            return;
+        }
+        let current = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+        let found = null;
+        while (current && current !== root) {
+            if (current.nodeType === Node.ELEMENT_NODE) {
+                const el = current;
+                if (el.dataset?.tag === 'code') {
+                    found = el;
+                    break;
+                }
+            }
+            current = current.parentNode;
+        }
+        if (!found) {
+            setActiveCodeBlock(null);
+            setCodeLanguage('');
+            setLangPosition(null);
+            return;
+        }
+        setActiveCodeBlock(found);
+        setCodeLanguage(found.dataset.lg ?? '');
+        setLangPosition({
+            top: found.offsetTop + 6,
+            left: found.offsetLeft + 8,
+        });
+    }, []);
+    useEffect(() => {
+        const root = ref.current;
+        const onSelectionChange = () => syncActiveCode();
+        const onResize = () => syncActiveCode();
+        document.addEventListener('selectionchange', onSelectionChange);
+        window.addEventListener('resize', onResize);
+        root?.addEventListener('scroll', onSelectionChange);
+        syncActiveCode();
+        return () => {
+            document.removeEventListener('selectionchange', onSelectionChange);
+            window.removeEventListener('resize', onResize);
+            root?.removeEventListener('scroll', onSelectionChange);
+        };
+    }, [syncActiveCode]);
     const handleInput = useCallback(() => {
         const el = ref.current;
         if (!el)
@@ -58,7 +117,8 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         if (preEditOffset !== null)
             setCursorOffset(el, preEditOffset);
         onChange(markup);
-    }, [onChange, maxLength]);
+        syncActiveCode();
+    }, [onChange, maxLength, syncActiveCode]);
     const handlePaste = useCallback((e) => {
         const text = sanitisePaste(e.nativeEvent);
         document.execCommand('insertText', false, text);
@@ -76,5 +136,39 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
             handleInput();
         }
     }, [handleInput]);
-    return (_jsxs("div", { className: className, style: themeVars(currentTheme), children: [_jsx(Toolbar, { editorRef: ref, onFormat: handleInput, currentTheme: currentTheme }), _jsx("div", { ref: ref, contentEditable: true, suppressContentEditableWarning: true, "data-hs-editor": "", "data-placeholder": placeholder, onInput: handleInput, onPaste: handlePaste, onKeyDown: handleKeyDown })] }));
+    const handleLanguageChange = useCallback((nextLanguage) => {
+        const codeEl = activeCodeBlock;
+        if (!codeEl)
+            return;
+        const lg = sanitiseCodeLanguage(nextLanguage);
+        if (lg)
+            codeEl.dataset.lg = lg;
+        else
+            delete codeEl.dataset.lg;
+        setCodeLanguage(lg ?? '');
+        handleInput();
+    }, [activeCodeBlock, handleInput]);
+    return (_jsxs("div", { className: className, style: { ...themeVars(currentTheme), position: 'relative' }, children: [_jsx(Toolbar, { editorRef: ref, onFormat: handleInput, currentTheme: currentTheme }), _jsx("div", { ref: ref, contentEditable: true, suppressContentEditableWarning: true, "data-hs-editor": "", "data-placeholder": placeholder, onInput: handleInput, onPaste: handlePaste, onKeyDown: handleKeyDown }), activeCodeBlock && langPosition && (_jsxs("label", { style: {
+                    position: 'absolute',
+                    top: `${langPosition.top}px`,
+                    left: `${langPosition.left}px`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    zIndex: 20,
+                    color: '#abb2bf',
+                    background: '#2d2d2d',
+                    border: `1px solid ${currentTheme.border}`,
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '0.75em',
+                    fontFamily: 'monospace',
+                }, children: ["Lang", _jsxs("select", { value: codeLanguage, onChange: e => handleLanguageChange(e.target.value), onMouseDown: e => e.stopPropagation(), style: {
+                            background: '#2d2d2d',
+                            color: '#f8f8f2',
+                            border: `1px solid ${currentTheme.border}`,
+                            borderRadius: '3px',
+                            fontSize: '0.9em',
+                            padding: '1px 4px',
+                        }, children: [_jsx("option", { value: "", children: "none" }), Array.from(CODE_LANGUAGES).map(lang => (_jsx("option", { value: lang, children: lang }, lang)))] })] }))] }));
 }

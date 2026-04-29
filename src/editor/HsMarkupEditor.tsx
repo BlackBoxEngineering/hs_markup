@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { displayToMarkup } from '../parser/displayToMarkup';
 import { sanitisePaste } from './pasteSanitiser';
 import { commands } from './commands';
@@ -9,6 +9,7 @@ import { getCursorOffset, setCursorOffset } from './cursor';
 import { themeVars, editorCSS } from './editorStyles';
 import { Toolbar } from './Toolbar';
 import type { Theme } from '../theme';
+import { CODE_LANGUAGES, sanitiseCodeLanguage } from '../language/codeLang';
 
 let styleInjected = false;
 
@@ -32,6 +33,9 @@ export function HsMarkupEditor({
   const ref = useRef<HTMLDivElement>(null);
   const isInternalChange = useRef(false);
   const lastValue = useRef(content);
+  const [activeCodeBlock, setActiveCodeBlock] = useState<HTMLElement | null>(null);
+  const [codeLanguage, setCodeLanguage] = useState<string>('');
+  const [langPosition, setLangPosition] = useState<{ top: number; left: number } | null>(null);
 
   // inject scoped styles once
   useEffect(() => {
@@ -58,6 +62,69 @@ export function HsMarkupEditor({
     if (offset !== null) setCursorOffset(el, offset);
   }, [content]);
 
+  const syncActiveCode = useCallback(() => {
+    const root = ref.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0) {
+      setActiveCodeBlock(null);
+      setCodeLanguage('');
+      setLangPosition(null);
+      return;
+    }
+
+    const node = sel.anchorNode;
+    if (!node || !root.contains(node)) {
+      setActiveCodeBlock(null);
+      setCodeLanguage('');
+      setLangPosition(null);
+      return;
+    }
+
+    let current: Node | null = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+    let found: HTMLElement | null = null;
+    while (current && current !== root) {
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        const el = current as HTMLElement;
+        if (el.dataset?.tag === 'code') {
+          found = el;
+          break;
+        }
+      }
+      current = current.parentNode;
+    }
+
+    if (!found) {
+      setActiveCodeBlock(null);
+      setCodeLanguage('');
+      setLangPosition(null);
+      return;
+    }
+
+    setActiveCodeBlock(found);
+    setCodeLanguage(found.dataset.lg ?? '');
+    setLangPosition({
+      top: found.offsetTop + 6,
+      left: found.offsetLeft + 8,
+    });
+  }, []);
+
+  useEffect(() => {
+    const root = ref.current;
+    const onSelectionChange = () => syncActiveCode();
+    const onResize = () => syncActiveCode();
+
+    document.addEventListener('selectionchange', onSelectionChange);
+    window.addEventListener('resize', onResize);
+    root?.addEventListener('scroll', onSelectionChange);
+    syncActiveCode();
+
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+      window.removeEventListener('resize', onResize);
+      root?.removeEventListener('scroll', onSelectionChange);
+    };
+  }, [syncActiveCode]);
+
   const handleInput = useCallback(() => {
     const el = ref.current;
     if (!el) return;
@@ -76,7 +143,8 @@ export function HsMarkupEditor({
     el.innerHTML = markupToEditorHTML(markup);
     if (preEditOffset !== null) setCursorOffset(el, preEditOffset);
     onChange(markup);
-  }, [onChange, maxLength]);
+    syncActiveCode();
+  }, [onChange, maxLength, syncActiveCode]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
     const text = sanitisePaste(e.nativeEvent);
@@ -92,8 +160,20 @@ export function HsMarkupEditor({
     if (cmd) { e.preventDefault(); commands[cmd](); handleInput(); }
   }, [handleInput]);
 
+  const handleLanguageChange = useCallback((nextLanguage: string) => {
+    const codeEl = activeCodeBlock;
+    if (!codeEl) return;
+
+    const lg = sanitiseCodeLanguage(nextLanguage);
+    if (lg) codeEl.dataset.lg = lg;
+    else delete codeEl.dataset.lg;
+
+    setCodeLanguage(lg ?? '');
+    handleInput();
+  }, [activeCodeBlock, handleInput]);
+
   return (
-    <div className={className} style={themeVars(currentTheme)}>
+    <div className={className} style={{ ...themeVars(currentTheme), position: 'relative' }}>
       <Toolbar editorRef={ref} onFormat={handleInput} currentTheme={currentTheme} />
       <div
         ref={ref}
@@ -105,6 +185,46 @@ export function HsMarkupEditor({
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
       />
+      {activeCodeBlock && langPosition && (
+        <label
+          style={{
+            position: 'absolute',
+            top: `${langPosition.top}px`,
+            left: `${langPosition.left}px`,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            zIndex: 20,
+            color: '#abb2bf',
+            background: '#2d2d2d',
+            border: `1px solid ${currentTheme.border}`,
+            borderRadius: '4px',
+            padding: '2px 6px',
+            fontSize: '0.75em',
+            fontFamily: 'monospace',
+          }}
+        >
+          Lang
+          <select
+            value={codeLanguage}
+            onChange={e => handleLanguageChange(e.target.value)}
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              background: '#2d2d2d',
+              color: '#f8f8f2',
+              border: `1px solid ${currentTheme.border}`,
+              borderRadius: '3px',
+              fontSize: '0.9em',
+              padding: '1px 4px',
+            }}
+          >
+            <option value="">none</option>
+            {Array.from(CODE_LANGUAGES).map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   );
 }

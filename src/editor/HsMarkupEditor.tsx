@@ -13,7 +13,7 @@ import type { Theme } from '../theme';
 let styleInjected = false;
 
 type Props = {
-  value: string;
+  content: string;
   onChange: (markup: string) => void;
   currentTheme: Theme;
   maxLength?: number;
@@ -22,7 +22,7 @@ type Props = {
 };
 
 export function HsMarkupEditor({
-  value,
+  content,
   onChange,
   currentTheme,
   maxLength,
@@ -31,7 +31,7 @@ export function HsMarkupEditor({
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const isInternalChange = useRef(false);
-  const lastValue = useRef(value);
+  const lastValue = useRef(content);
 
   // inject scoped styles once
   useEffect(() => {
@@ -50,13 +50,13 @@ export function HsMarkupEditor({
       isInternalChange.current = false;
       return;
     }
-    if (value === lastValue.current && el.innerHTML) return;
-    lastValue.current = value;
+    if (content === lastValue.current && el.innerHTML) return;
+    lastValue.current = content;
 
     const offset = getCursorOffset(el);
-    el.innerHTML = markupToEditorHTML(value);
+    el.innerHTML = markupToEditorHTML(content);
     if (offset !== null) setCursorOffset(el, offset);
-  }, [value]);
+  }, [content]);
 
   const handleInput = useCallback(() => {
     const el = ref.current;

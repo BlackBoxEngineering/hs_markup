@@ -35,7 +35,7 @@ export function HsMarkupEditor({
   const lastValue = useRef(content);
   const [activeCodeBlock, setActiveCodeBlock] = useState<HTMLElement | null>(null);
   const [codeLanguage, setCodeLanguage] = useState<string>('');
-  const [langPosition, setLangPosition] = useState<{ top: number; left: number } | null>(null);
+  const [langPosition, setLangPosition] = useState<{ top: number; right: number } | null>(null);
 
   // inject scoped styles once
   useEffect(() => {
@@ -102,10 +102,11 @@ export function HsMarkupEditor({
 
     setActiveCodeBlock(found);
     setCodeLanguage(found.dataset.lg ?? '');
-    setLangPosition({
-      top: found.offsetTop + 6,
-      left: found.offsetLeft + 8,
-    });
+    const editorRect = root.getBoundingClientRect();
+    const codeRect = found.getBoundingClientRect();
+    const right = Math.max(8, editorRect.right - codeRect.right + 8);
+    const top = Math.max(6, codeRect.top - editorRect.top + 6);
+    setLangPosition({ top, right });
   }, []);
 
   useEffect(() => {
@@ -190,7 +191,7 @@ export function HsMarkupEditor({
           style={{
             position: 'absolute',
             top: `${langPosition.top}px`,
-            left: `${langPosition.left}px`,
+            right: `${langPosition.right}px`,
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',

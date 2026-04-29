@@ -79,10 +79,11 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         }
         setActiveCodeBlock(found);
         setCodeLanguage(found.dataset.lg ?? '');
-        setLangPosition({
-            top: found.offsetTop + 6,
-            left: found.offsetLeft + 8,
-        });
+        const editorRect = root.getBoundingClientRect();
+        const codeRect = found.getBoundingClientRect();
+        const right = Math.max(8, editorRect.right - codeRect.right + 8);
+        const top = Math.max(6, codeRect.top - editorRect.top + 6);
+        setLangPosition({ top, right });
     }, []);
     useEffect(() => {
         const root = ref.current;
@@ -151,7 +152,7 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
     return (_jsxs("div", { className: className, style: { ...themeVars(currentTheme), position: 'relative' }, children: [_jsx(Toolbar, { editorRef: ref, onFormat: handleInput, currentTheme: currentTheme }), _jsx("div", { ref: ref, contentEditable: true, suppressContentEditableWarning: true, "data-hs-editor": "", "data-placeholder": placeholder, onInput: handleInput, onPaste: handlePaste, onKeyDown: handleKeyDown }), activeCodeBlock && langPosition && (_jsxs("label", { style: {
                     position: 'absolute',
                     top: `${langPosition.top}px`,
-                    left: `${langPosition.left}px`,
+                    right: `${langPosition.right}px`,
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',

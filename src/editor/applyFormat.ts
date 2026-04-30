@@ -22,30 +22,39 @@ export function applyFormat(tag: string, options?: FormatOptions): void {
 
   // clone first so we never lose content
   const fragment = range.cloneContents();
-  const text = PRESERVE_WHITESPACE_TAGS.has(tag)
-    ? extractTextPreserving(fragment)
-    : range.toString();
 
-  if (!text) return;
-
-  // now safe to delete and replace
-  range.deleteContents();
-
-  const wrapper = document.createElement('span');
-  wrapper.dataset.tag = tag;
-  if (tag === 'code') {
+  // for code: extract plain text preserving newlines
+  // for all other tags: preserve the child DOM structure (keeps formatting + line breaks)
+  if (PRESERVE_WHITESPACE_TAGS.has(tag)) {
+    const text = extractTextPreserving(fragment);
+    if (!text) return;
+    range.deleteContents();
+    const wrapper = document.createElement('span');
+    wrapper.dataset.tag = tag;
     const lg = sanitiseCodeLanguage(options?.codeLanguage);
     if (lg) wrapper.dataset.lg = lg;
     wrapper.setAttribute('spellcheck', 'false');
     wrapper.setAttribute('autocorrect', 'off');
     wrapper.setAttribute('autocapitalize', 'off');
     wrapper.setAttribute('autocomplete', 'off');
+    wrapper.textContent = text;
+    range.insertNode(wrapper);
+    cleanEmptySpans(wrapper.parentElement);
+    const newRange = document.createRange();
+    newRange.selectNodeContents(wrapper);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    return;
   }
-  wrapper.textContent = text;
+
+  // non-code: wrap the cloned fragment preserving all child nodes
+  if (!fragment.textContent) return;
+  range.deleteContents();
+  const wrapper = document.createElement('span');
+  wrapper.dataset.tag = tag;
+  wrapper.appendChild(fragment);
   range.insertNode(wrapper);
-
   cleanEmptySpans(wrapper.parentElement);
-
   const newRange = document.createRange();
   newRange.selectNodeContents(wrapper);
   sel.removeAllRanges();

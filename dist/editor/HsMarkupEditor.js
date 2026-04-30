@@ -186,17 +186,26 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
         emitMarkup();
     }, [emitMarkup]);
     const handleKeyDown = useCallback((e) => {
-        // Enter inside a code block: insert a plain newline, not a <div>/<br>
         if (e.key === 'Enter') {
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0) {
                 const range = sel.getRangeAt(0);
                 let node = sel.anchorNode;
                 let insideCode = false;
+                let insideQuote = false;
+                let quoteSpan = null;
                 while (node && node !== ref.current) {
-                    if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.tag === 'code') {
-                        insideCode = true;
-                        break;
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const tag = node.dataset?.tag;
+                        if (tag === 'code') {
+                            insideCode = true;
+                            break;
+                        }
+                        if (tag === 'q' && !e.shiftKey) {
+                            insideQuote = true;
+                            quoteSpan = node;
+                            break;
+                        }
                     }
                     node = node.parentNode;
                 }
@@ -209,6 +218,22 @@ export function HsMarkupEditor({ content, onChange, currentTheme, maxLength, pla
                     range.collapse(true);
                     sel.removeAllRanges();
                     sel.addRange(range);
+                    emitMarkup();
+                    return;
+                }
+                if (insideQuote && quoteSpan) {
+                    e.preventDefault();
+                    range.deleteContents();
+                    // insert a <br> immediately after the quote span, then place cursor after it
+                    const br = document.createElement('br');
+                    const textNode = document.createTextNode('\u200B'); // zero-width space to anchor cursor
+                    quoteSpan.after(br);
+                    br.after(textNode);
+                    const newRange = document.createRange();
+                    newRange.setStartAfter(br);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
                     emitMarkup();
                     return;
                 }

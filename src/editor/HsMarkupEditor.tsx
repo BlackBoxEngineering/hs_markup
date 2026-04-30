@@ -219,17 +219,19 @@ export function HsMarkupEditor({
   }, [emitMarkup]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Enter inside a code block: insert a plain newline, not a <div>/<br>
     if (e.key === 'Enter') {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         let node: Node | null = sel.anchorNode;
         let insideCode = false;
+        let insideQuote = false;
+        let quoteSpan: HTMLElement | null = null;
         while (node && node !== ref.current) {
-          if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).dataset?.tag === 'code') {
-            insideCode = true;
-            break;
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tag = (node as HTMLElement).dataset?.tag;
+            if (tag === 'code') { insideCode = true; break; }
+            if (tag === 'q' && !e.shiftKey) { insideQuote = true; quoteSpan = node as HTMLElement; break; }
           }
           node = node.parentNode;
         }
@@ -243,6 +245,23 @@ export function HsMarkupEditor({
           range.collapse(true);
           sel.removeAllRanges();
           sel.addRange(range);
+          emitMarkup();
+          return;
+        }
+
+        if (insideQuote && quoteSpan) {
+          e.preventDefault();
+          range.deleteContents();
+          // insert a <br> immediately after the quote span, then place cursor after it
+          const br = document.createElement('br');
+          const textNode = document.createTextNode('\u200B'); // zero-width space to anchor cursor
+          quoteSpan.after(br);
+          br.after(textNode);
+          const newRange = document.createRange();
+          newRange.setStartAfter(br);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
           emitMarkup();
           return;
         }

@@ -43,16 +43,20 @@ Example:
 
 ## Install
 
-### From npm
-
-```bash
-npm install hs_markup
-```
-
-### From GitHub/local during development
+Not on npm yet. Install locally from the repo:
 
 ```bash
 npm install ../hs_markup
+```
+
+Or add it to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "hs_markup": "file:../hs_markup"
+  }
+}
 ```
 
 ## Basic usage
@@ -118,25 +122,6 @@ Accepted legacy tags are normalized to canonical short tags on parse.
 - `[title]` -> `[t]`
 - `[quote]` -> `[q]`
 - `[highlight]` -> `[hl]`
-
-## Publish checklist
-
-```bash
-npm run build
-npm test
-npm login
-npm publish
-```
-
-Then consumers can use:
-
-```json
-{
-  "dependencies": {
-    "hs_markup": "^0.1.0"
-  }
-}
-```
 
 ## Tests
 

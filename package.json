@@ -1,6 +1,6 @@
 {
   "name": "hs_markup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lightweight React rich-text editor. Stores content as plain-text markup, not HTML.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,14 +11,23 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/BlackBoxEngineering/hs_markup.git"
   },
   "sideEffects": false,
-  "keywords": ["markup", "editor", "react", "rich-text", "wysiwyg"],
+  "keywords": [
+    "markup",
+    "editor",
+    "react",
+    "rich-text",
+    "wysiwyg"
+  ],
   "engines": {
     "node": ">=18"
   },

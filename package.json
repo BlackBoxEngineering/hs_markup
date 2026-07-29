@@ -1,18 +1,27 @@
 {
   "name": "hs_markup",
   "version": "0.1.0",
-  "description": "Lightweight markup language + WYSIWYG editor for Handshake-native rich text",
+  "description": "Lightweight React rich-text editor. Stores content as plain-text markup, not HTML.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlackBoxEngineering/hs_markup.git"
+  },
+  "sideEffects": false,
+  "keywords": ["markup", "editor", "react", "rich-text", "wysiwyg"],
+  "engines": {
+    "node": ">=18"
+  },
   "peerDependencies": {
     "react": ">=18"
   },

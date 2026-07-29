@@ -43,10 +43,8 @@ Example:
 
 ## Install
 
-Not on npm yet. Install locally from the repo:
-
 ```bash
-npm install ../hs_markup
+npm install hs_markup
 ```
 
 Or add it to your `package.json`:
@@ -54,7 +52,7 @@ Or add it to your `package.json`:
 ```json
 {
   "dependencies": {
-    "hs_markup": "file:../hs_markup"
+    "hs_markup": "^0.1.0"
   }
 }
 ```
@@ -129,7 +127,7 @@ Accepted legacy tags are normalized to canonical short tags on parse.
 npm test
 ```
 
-Current suite includes parser, round-trip, tags, and highlighting tests.
+54 tests across parser, round-trip, tags, and highlighting.
 
 ## License
 
